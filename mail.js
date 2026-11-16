@@ -135,7 +135,7 @@ export async function readMessage({ config, password, folder = 'INBOX', uid }) {
   return withClient(config, password, async client => {
     const lock = await client.getMailboxLock(folder)
     try {
-      const message = await client.fetchOne({ uid: wanted }, { source: true, envelope: true, flags: true }, { uid: true })
+      const message = await client.fetchOne(String(wanted), { source: true, envelope: true, flags: true }, { uid: true })
       if (!message?.source) throw new Error('письмо не найдено')
       const parsed = await simpleParser(message.source)
       const text = (parsed.text || htmlToText(parsed.html || '')).slice(0, MAX_BODY)
