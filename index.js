@@ -479,7 +479,9 @@ function createHandler(store) {
 
 /* ------------------------------------------------------------------ tools */
 
-const textRender = value => [{
+// ToolOutputDefinition.render receives (args, value); the message must come
+// from the validated value, never from the arguments.
+const textRender = (args, value) => [{
   type: 'text',
   text: typeof value?.message === 'string' ? value.message : JSON.stringify(value),
 }]

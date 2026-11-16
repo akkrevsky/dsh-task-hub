@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import {
   TaskStore,
+  apply,
   createEvent,
   createHandler,
   createList,
@@ -201,7 +202,30 @@ try {
   assert.equal(eventDel.status, 200)
   assert.equal(eventDel.body.state.events.length, 1, 'only the created event is removed')
 
-  console.log('ok: store, persistence, cascade, events, validation and routes')
+  // --- tool definitions -----------------------------------------------------
+  const definitions = []
+  apply({
+    effect(fn) {
+      fn()
+    },
+    webServer: { register: () => () => {} },
+    tools: {
+      register(definition) {
+        definitions.push(definition)
+      },
+    },
+  })
+  assert.deepEqual(
+    definitions.map(definition => definition.name).sort(),
+    ['calendar_agenda', 'tasks_create', 'tasks_list', 'tasks_update'],
+    'all four tools are registered',
+  )
+  const agenda = definitions.find(definition => definition.name === 'calendar_agenda')
+  assert.deepEqual(agenda.output.render({}, { ok: true, message: 'hello' }), [{ type: 'text', text: 'hello' }],
+    'render projects the value message, not the arguments')
+  assert.deepEqual(agenda.parameters.required, undefined, 'range arguments stay optional')
+
+  console.log('ok: store, persistence, cascade, events, validation, routes and tools')
 } finally {
   await rm(dir, { recursive: true, force: true })
 }
