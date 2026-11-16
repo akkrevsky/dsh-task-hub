@@ -37,6 +37,9 @@ DeepSeek Harness left sidebar.
 - Mail: a second `main` panel (`dsh-task-hub-mail`) and rail entry; IMAP via
   `imapflow`, bodies via `mailparser`; the reader returns plain text (HTML is
   stripped), and "To task" copies the subject and the beginning of the body.
+- Every IMAP operation runs in a short-lived child process (`mail-cli.mjs`):
+  imapflow 1.7.8 can emit an unhandled rejection when a server drops the
+  connection, which would end the Host. In a child it only fails that request.
 - Client strings for `en` and `ru`; the UI follows the host theme through
   `--dsw-alias-*` tokens.
 
