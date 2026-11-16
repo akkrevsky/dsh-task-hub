@@ -52,6 +52,15 @@ const sampleAccount = {
   status: 'ok',
   error: null,
   lastSyncAt: iso(today),
+  mail: {
+    provider: 'yandex',
+    host: 'imap.yandex.ru',
+    port: 993,
+    secure: true,
+    username: 'me@example.com',
+    status: 'ok',
+    lastCheckAt: iso(today),
+  },
 }
 
 const calls = []
@@ -63,6 +72,36 @@ globalThis.fetch = async (url, options = {}) => {
     const event = { id: 'e2', title: body.title, notes: '', startAt: body.startAt, endAt: body.endAt, allDay: false, color: '#4D6BFE', taskId: body.taskId ?? null, createdAt: iso(today), updatedAt: iso(today) }
     state = { ...state, events: [...state.events, event] }
     return { ok: true, status: 200, text: async () => JSON.stringify({ state, event }) }
+  }
+  if (String(url).includes('/mail/folders')) {
+    return { ok: true, status: 200, text: async () => JSON.stringify({ folders: [{ path: 'INBOX', name: 'INBOX', specialUse: '\\Inbox' }] }) }
+  }
+  if (String(url).includes('/mail/messages')) {
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        folder: 'INBOX',
+        exists: 1,
+        messages: [{ uid: 7, subject: 'Привет из почты', fromName: 'Анна', fromAddress: 'a@example.com', date: iso(today), seen: false, size: 1024 }],
+      }),
+    }
+  }
+  if (String(url).includes('/mail/message')) {
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        uid: 7,
+        folder: 'INBOX',
+        subject: 'Привет из почты',
+        from: 'Анна <a@example.com>',
+        to: 'me@example.com',
+        date: iso(today),
+        text: 'Тело письма',
+        attachments: [],
+      }),
+    }
   }
   if (String(url).endsWith('/accounts') && method === 'GET') {
     return { ok: true, status: 200, text: async () => JSON.stringify({ accounts: [sampleAccount] }) }
@@ -210,5 +249,23 @@ await tick()
 await tick()
 if (!calls.some(call => /\/accounts\/[^/]+\/sync$/.test(String(call.url)))) throw new Error('sync did not call the API')
 
-console.log('ok: lists, month/week/agenda render, day click creates an event, event drawer opens, task → calendar links, accounts tab')
+// mail panel (second registration)
+const mailRegistration = registrations.find(registration => registration.options.key === 'dsh-task-hub-mail')
+if (!mailRegistration) throw new Error('mail panel is not registered')
+const mailHost = document.createElement('div')
+document.body.appendChild(mailHost)
+const mailRoot = createRoot(mailHost)
+mailRoot.render(React.createElement(mailRegistration.component, { t }))
+await tick()
+await tick()
+if (!mailHost.textContent.includes('Привет из почты')) throw new Error('mail list did not render: ' + mailHost.textContent.slice(0, 200))
+const mailRow = [...mailHost.querySelectorAll('div')].find(node => node.textContent.includes('Привет из почты') && node.style.cursor === 'pointer')
+if (!mailRow) throw new Error('mail row is not clickable')
+click(mailRow)
+await tick()
+await tick()
+if (!mailHost.textContent.includes('Тело письма')) throw new Error('mail body did not render')
+mailRoot.unmount()
+
+console.log('ok: lists, calendar views, day click, event drawer, task → calendar, accounts tab, mail list and reader')
 console.log('calls:', calls.map(c => `${c.method} ${String(c.url).replace('http://127.0.0.1:3080', '')}`).join(', '))

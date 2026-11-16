@@ -3,10 +3,10 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M3 — task calendar with two-way CalDAV.** Lists, a task tree, a
-> calendar and Yandex / Mail.ru / generic CalDAV accounts: provider events are
-> imported and Task Hub events are written back with ETag guards. Google
-> Calendar (OAuth), VTODO sync and mail are not implemented yet.
+> **Status: M5 (read) — tasks, calendar and mail.** Lists, a task tree, a
+> calendar with two-way CalDAV and a separate Mail panel over IMAP (Yandex /
+> Mail.ru / Gmail): folders, message list, reader and "To task". Sending mail,
+> Google Calendar (OAuth) and VTODO sync are not implemented yet.
 
 ## What works today
 
@@ -34,6 +34,9 @@ DeepSeek Harness left sidebar.
   iCalendar reader for VEVENT (TZID/DST via `Intl`, all-day, DURATION), and a
   read-only badge in the event editor. Passwords live in `secrets.json` (0600)
   and never reach the browser.
+- Mail: a second `main` panel (`dsh-task-hub-mail`) and rail entry; IMAP via
+  `imapflow`, bodies via `mailparser`; the reader returns plain text (HTML is
+  stripped), and "To task" copies the subject and the beginning of the body.
 - Client strings for `en` and `ru`; the UI follows the host theme through
   `--dsw-alias-*` tokens.
 
@@ -41,7 +44,7 @@ DeepSeek Harness left sidebar.
 
 - Imported events open read-only; edit-back of an existing provider event is the next step.
 - Deleting an imported event deletes it on the provider too.
-- Google Calendar (M4) and mail (M5) are not implemented.
+- Google Calendar (M4) is not implemented; mail is read-only (no SMTP).
 - The week view shows a 24-hour grid without drag-and-drop resizing.
 - Single user, single profile: no sharing, no conflict resolution.
 - The store is a plain JSON file; it is not a database and has no history.
@@ -56,7 +59,8 @@ DeepSeek Harness left sidebar.
 | M3 (pull) ✅ | CalDAV import: Yandex and Mail.ru, discovery, iCalendar reader |
 | M3 (push) ✅ | Create/update/delete events with If-None-Match/If-Match, conflict surfaced as an error |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
-| M5 | Mail over IMAP for Gmail / Yandex / Mail.ru, "turn a message into a task" |
+| M5 (read) ✅ | Mail over IMAP, read-only, "to task" |
+| M5 (send) | Reply/forward over SMTP with confirmation |
 | M6 | Agent tools for calendar and mail, SMTP with explicit confirmation, polish |
 
 ## Installation

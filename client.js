@@ -122,6 +122,29 @@ window.__ModuleLoader__.load({
       connectLink: 'Connect',
       confirmRemove: 'Remove this account? Imported events will be deleted.',
       hoursShort: 'h',
+      mailTitle: 'Mail',
+      mailInbox: 'Inbox',
+      mailFolders: 'Folders',
+      mailNoMail: 'Mail is not connected',
+      mailNoMailHint: 'Connect an IMAP mailbox to read messages and turn them into tasks.',
+      mailConnect: 'Connect mail',
+      mailAccount: 'Account',
+      mailProvider: 'Provider',
+      mailLogin: 'Login / email',
+      mailPassword: 'App password',
+      mailHost: 'IMAP host',
+      mailConnectBtn: 'Connect',
+      mailConnecting: 'Connecting…',
+      mailRefresh: 'Refresh',
+      mailEmpty: 'No messages',
+      mailPick: 'Pick a message',
+      mailLoading: 'Loading…',
+      mailToTask: 'To task',
+      mailTaskCreated: 'Task created',
+      mailAttachments: 'Attachments',
+      mailFrom: 'From',
+      mailNoAccounts: 'Connect an account on the Accounts tab first.',
+      mailFailed: 'Mail request failed',
     }
 
     const RU = {
@@ -223,6 +246,29 @@ window.__ModuleLoader__.load({
       connectLink: 'Подключить',
       confirmRemove: 'Удалить аккаунт? Импортированные события будут удалены.',
       hoursShort: 'ч',
+      mailTitle: 'Почта',
+      mailInbox: 'Входящие',
+      mailFolders: 'Папки',
+      mailNoMail: 'Почта не подключена',
+      mailNoMailHint: 'Подключите IMAP-ящик, чтобы читать письма и превращать их в задачи.',
+      mailConnect: 'Подключить почту',
+      mailAccount: 'Аккаунт',
+      mailProvider: 'Провайдер',
+      mailLogin: 'Логин / email',
+      mailPassword: 'Пароль приложения',
+      mailHost: 'IMAP-сервер',
+      mailConnectBtn: 'Подключить',
+      mailConnecting: 'Подключаю…',
+      mailRefresh: 'Обновить',
+      mailEmpty: 'Писем нет',
+      mailPick: 'Выберите письмо',
+      mailLoading: 'Загрузка…',
+      mailToTask: 'В задачу',
+      mailTaskCreated: 'Задача создана',
+      mailAttachments: 'Вложения',
+      mailFrom: 'От',
+      mailNoAccounts: 'Сначала подключите аккаунт на вкладке «Аккаунты».',
+      mailFailed: 'Запрос к почте не удался',
     }
 
     /* ------------------------------------------------------------- helpers */
@@ -781,6 +827,10 @@ window.__ModuleLoader__.load({
           h('path', { key: 'p', d: 'M2.5 7.5h13', ...common }),
         ],
         link: [h('path', { key: 'p', d: 'M7.5 10.5l3-3M6.5 12.5l-1.5 1.5a2.1 2.1 0 01-3-3L3.5 9.5M11.5 5.5L13 4a2.1 2.1 0 013 3l-1.5 1.5', ...common })],
+        mail: [
+          h('rect', { key: 'r', x: 2, y: 4, width: 14, height: 10, rx: 2.4, ...common }),
+          h('path', { key: 'p', d: 'M2.6 5.4L9 10l6.4-4.6', ...common }),
+        ],
       }
       return h('svg', { width: size, height: size, viewBox: '0 0 18 18', 'aria-hidden': true, style: { flex: '0 0 auto' } },
         paths[name] || paths.all)
@@ -2089,6 +2139,292 @@ window.__ModuleLoader__.load({
           drawer))
     }
 
+
+    function MailIcon(props) {
+      const size = typeof props.size === 'number' ? props.size : 18
+      return h('svg', {
+        width: size,
+        height: size,
+        viewBox: '0 0 18 18',
+        fill: 'none',
+        'aria-hidden': true,
+        style: { display: 'block' },
+      },
+      h('rect', { x: 1.9, y: 3.6, width: 14.2, height: 10.8, rx: 2.6, stroke: 'currentColor', strokeWidth: 1.5 }),
+      h('path', { d: 'M2.6 5.2L9 9.8l6.4-4.6', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }))
+    }
+
+    function MailPanel(props) {
+      const t = key => props.t?.(key) ?? EN[key] ?? key
+      const [accounts, setAccounts] = useState([])
+      const [accountId, setAccountId] = useState('')
+      const [folders, setFolders] = useState([])
+      const [folder, setFolder] = useState('INBOX')
+      const [messages, setMessages] = useState([])
+      const [exists, setExists] = useState(0)
+      const [selectedUid, setSelectedUid] = useState(null)
+      const [message, setMessage] = useState(null)
+      const [error, setError] = useState(null)
+      const [busy, setBusy] = useState(false)
+      const [toast, setToast] = useState(null)
+      const [form, setForm] = useState({ provider: 'yandex', username: '', password: '', host: '' })
+
+      const loadAccounts = useCallback(async () => {
+        try {
+          const payload = await api('/accounts')
+          const list = payload.accounts ?? []
+          setAccounts(list)
+          const withMail = list.find(item => item.mail)
+          const target = withMail ?? list[0]
+          if (target) {
+            setAccountId(current => current || target.id)
+            setForm(current => ({ ...current, username: current.username || target.username }))
+          }
+          setError(null)
+        } catch (cause) {
+          setError(cause.message)
+        }
+      }, [])
+
+      useEffect(() => {
+        loadAccounts()
+      }, [loadAccounts])
+
+      const mailAccount = accounts.find(item => item.id === accountId && item.mail) ?? null
+
+      const loadFolders = useCallback(async id => {
+        try {
+          const payload = await api(`/mail/folders?accountId=${encodeURIComponent(id)}`)
+          const list = payload.folders ?? []
+          setFolders(list)
+          if (!list.some(item => item.path === 'INBOX')) list.unshift({ path: 'INBOX', name: 'INBOX', specialUse: '\\Inbox' })
+        } catch (cause) {
+          setError(cause.message)
+        }
+      }, [])
+
+      const loadMessages = useCallback(async (id, targetFolder) => {
+        setBusy(true)
+        try {
+          const payload = await api(`/mail/messages?accountId=${encodeURIComponent(id)}&folder=${encodeURIComponent(targetFolder)}&limit=40`)
+          setMessages(payload.messages ?? [])
+          setExists(payload.exists ?? 0)
+          setError(null)
+        } catch (cause) {
+          setError(cause.message)
+        } finally {
+          setBusy(false)
+        }
+      }, [])
+
+      useEffect(() => {
+        if (!mailAccount) return
+        loadFolders(mailAccount.id)
+        loadMessages(mailAccount.id, folder)
+      }, [mailAccount?.id, folder, loadFolders, loadMessages])
+
+      const openMessage = async item => {
+        setSelectedUid(item.uid)
+        setMessage(null)
+        setBusy(true)
+        try {
+          const payload = await api(`/mail/message?accountId=${encodeURIComponent(accountId)}&folder=${encodeURIComponent(folder)}&uid=${item.uid}`)
+          setMessage(payload)
+          setError(null)
+        } catch (cause) {
+          setError(cause.message)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const connectMailbox = async () => {
+        setBusy(true)
+        setError(null)
+        try {
+          const payload = await api(`/accounts/${encodeURIComponent(accountId)}/mail`, {
+            method: 'POST',
+            body: JSON.stringify(form),
+          })
+          setAccounts(payload.accounts ?? [])
+          setForm(current => ({ ...current, password: '' }))
+          await loadAccounts()
+        } catch (cause) {
+          setError(cause.message)
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const toTask = async () => {
+        if (!message) return
+        const notes = [`${t('mailFrom')}: ${message.from}`, message.date ? new Date(message.date).toLocaleString() : '', '', message.text.slice(0, 2000)]
+          .filter(Boolean).join('\n')
+        try {
+          await api('/tasks', { method: 'POST', body: JSON.stringify({ title: message.subject, notes }) })
+          setToast(t('mailTaskCreated'))
+          setTimeout(() => setToast(null), 2500)
+        } catch (cause) {
+          setError(cause.message)
+        }
+      }
+
+      const header = h('header', { style: S.header },
+        h('span', { style: S.title }, t('mailTitle')),
+        mailAccount
+          ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginLeft: 10 } },
+            h(Glyph, { name: 'mail', size: 15, color: 'var(--dsw-alias-label-secondary)' }),
+            h('select', {
+              style: { ...S.fieldInput, width: 'auto', padding: '6px 8px' },
+              value: accountId,
+              onChange: event => {
+                setAccountId(event.target.value)
+                setFolder('INBOX')
+                setMessage(null)
+                setSelectedUid(null)
+              },
+            }, accounts.filter(item => item.mail).map(item => h('option', { key: item.id, value: item.id }, item.username))))
+          : null,
+        h('div', { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 } },
+          toast ? h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-state-success-primary)' } }, toast) : null,
+          mailAccount
+            ? h('button', { type: 'button', style: S.ghostBtn, onClick: () => loadMessages(mailAccount.id, folder) }, t('mailRefresh'))
+            : null))
+
+      if (accounts.length === 0) {
+        return h('div', { style: S.page },
+          header,
+          h('div', { style: S.empty }, t('mailNoAccounts')))
+      }
+
+      if (!mailAccount) {
+        const candidates = accounts.filter(item => !item.mail)
+        return h('div', { style: S.page },
+          header,
+          error ? h('div', { style: S.banner, role: 'alert' }, error) : null,
+          h('div', { style: { ...S.page, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' } },
+            h('div', { style: { ...S.formCard, marginTop: 24 } },
+              h('div', { style: S.pageTitle }, t('mailNoMail')),
+              h('div', { style: S.pageSub }, t('mailNoMailHint')),
+              candidates.length
+                ? h('div', { style: S.field },
+                  h('label', { style: S.label }, t('mailAccount')),
+                  h('select', {
+                    style: S.fieldInput,
+                    value: accountId,
+                    onChange: event => {
+                      const found = accounts.find(item => item.id === event.target.value)
+                      setAccountId(event.target.value)
+                      setForm(current => ({ ...current, username: found?.username ?? '', provider: found?.provider ?? 'yandex' }))
+                    },
+                  }, candidates.map(item => h('option', { key: item.id, value: item.id }, `${item.username} (${(PROVIDER[item.provider] || PROVIDER.caldav).label})`))))
+                : h('div', { style: { ...S.accountMeta, marginBottom: 12 } }, t('mailNoAccounts')),
+              h('div', { style: S.field },
+                h('label', { style: S.label }, t('mailProvider')),
+                h('select', {
+                  style: S.fieldInput,
+                  value: form.provider,
+                  onChange: event => setForm({ ...form, provider: event.target.value }),
+                }, [['yandex', 'Яндекс'], ['mailru', 'Mail.ru'], ['gmail', 'Gmail'], ['custom', 'Другой IMAP']]
+                  .map(([id, label]) => h('option', { key: id, value: id }, label)))),
+              h('div', { style: S.field },
+                h('label', { style: S.label }, t('mailLogin')),
+                h('input', { style: S.fieldInput, value: form.username, onChange: event => setForm({ ...form, username: event.target.value }) })),
+              h('div', { style: S.field },
+                h('label', { style: S.label }, t('mailPassword')),
+                h('input', { type: 'password', style: S.fieldInput, value: form.password, onChange: event => setForm({ ...form, password: event.target.value }) })),
+              form.provider === 'custom'
+                ? h('div', { style: S.field },
+                  h('label', { style: S.label }, t('mailHost')),
+                  h('input', { style: S.fieldInput, value: form.host, placeholder: 'imap.example.com', onChange: event => setForm({ ...form, host: event.target.value }) }))
+                : null,
+              h('button', {
+                type: 'button',
+                style: S.primaryBtn,
+                disabled: busy || !candidates.length,
+                onClick: connectMailbox,
+              }, busy ? t('mailConnecting') : t('mailConnectBtn')))))
+      }
+
+      const folderLabel = path => (path === 'INBOX' ? t('mailInbox') : path)
+      const formatWhen = value => {
+        if (!value) return ''
+        const date = new Date(value)
+        return sameDay(date, new Date())
+          ? hhmm(value)
+          : new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(date)
+      }
+
+      return h('div', { style: S.page },
+        header,
+        error ? h('div', { style: S.banner, role: 'alert' }, error) : null,
+        h('div', { style: { flex: 1, display: 'flex', minHeight: 0 } },
+          h('nav', { style: { ...S.nav, width: 176 } },
+            h('div', { style: S.navSection }, t('mailFolders')),
+            (folders.length ? folders : [{ path: 'INBOX', name: 'INBOX' }]).map(item => h(NavItem, {
+              key: item.path,
+              label: folderLabel(item.path),
+              icon: item.path === 'INBOX' ? 'today' : 'mail',
+              active: folder === item.path,
+              onClick: () => {
+                setFolder(item.path)
+                setMessage(null)
+                setSelectedUid(null)
+              },
+            }))),
+          h('div', { style: { width: 340, flex: '0 0 auto', borderRight: '1px solid var(--dsw-alias-border-l1)', overflowY: 'auto' } },
+            h('div', { style: { padding: '10px 14px', borderBottom: '1px solid var(--dsw-alias-border-l1)', fontSize: 11, color: 'var(--dsw-alias-label-secondary)' } },
+              `${exists} · ${folderLabel(folder)}${busy ? ' · …' : ''}`),
+            messages.length === 0
+              ? h('div', { style: { ...S.empty, padding: '32px 16px' } }, t('mailEmpty'))
+              : messages.map(item => h('div', {
+                key: item.uid,
+                onClick: () => openMessage(item),
+                style: {
+                  display: 'flex',
+                  gap: 9,
+                  padding: '10px 14px',
+                  borderBottom: '1px solid var(--dsw-alias-border-l1)',
+                  cursor: 'pointer',
+                  background: selectedUid === item.uid ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                },
+              },
+              h('span', {
+                style: {
+                  width: 6,
+                  height: 6,
+                  marginTop: 6,
+                  borderRadius: 999,
+                  flex: '0 0 auto',
+                  background: item.seen ? 'transparent' : 'var(--dsw-alias-brand-primary)',
+                },
+              }),
+              h('div', { style: { minWidth: 0, flex: 1 } },
+                h('div', { style: { display: 'flex', gap: 8, alignItems: 'baseline' } },
+                  h('span', { style: { fontSize: 12, fontWeight: item.seen ? 500 : 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                    item.fromName || item.fromAddress || '—'),
+                  h('span', { style: { marginLeft: 'auto', fontSize: 10, color: 'var(--dsw-alias-label-secondary)', whiteSpace: 'nowrap' } }, formatWhen(item.date))),
+                h('div', { style: { fontSize: 11.5, color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                  item.subject))))),
+          h('div', { style: { flex: 1, minWidth: 0, overflowY: 'auto', padding: '18px 22px' } },
+            message
+              ? h('div', null,
+                h('div', { style: { fontSize: 16, fontWeight: 600, marginBottom: 6 } }, message.subject),
+                h('div', { style: { ...S.accountMeta, marginBottom: 4 } }, `${t('mailFrom')}: ${message.from}`),
+                h('div', { style: { ...S.accountMeta, marginBottom: 14 } }, message.date ? new Date(message.date).toLocaleString() : ''),
+                h('div', { style: { fontSize: 12.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }, message.text || '—'),
+                message.attachments?.length
+                  ? h('div', { style: { marginTop: 16 } },
+                    h('div', { style: S.label }, t('mailAttachments')),
+                    message.attachments.map(item => h('div', { key: item.filename, style: S.railRow },
+                      h(Glyph, { name: 'mail', size: 14, color: 'var(--dsw-alias-label-secondary)' }),
+                      h('span', null, item.filename),
+                      h('span', { style: S.railMuted }, `${Math.round((item.size || 0) / 1024)} КБ`))))
+                  : null,
+                h('button', { type: 'button', style: { ...S.primaryBtn, marginTop: 18 }, onClick: toTask }, t('mailToTask')))
+              : h('div', { style: S.empty }, busy ? t('mailLoading') : t('mailPick')))))
+    }
+
     function PanelIcon(props) {
       const size = typeof props.size === 'number' ? props.size : 18
       return h('svg', {
@@ -2129,6 +2465,8 @@ window.__ModuleLoader__.load({
 
         ctx.slots.inject('main', () =>
           ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS }, Panel))
+        ctx.slots.inject('main', () =>
+          ctx.slots.register({ name: 'main', key: 'dsh-task-hub-mail', locale: NS }, MailPanel))
         ctx.slots.inject('sidebar.panellist', () =>
           ctx.slots.register({
             name: 'sidebar.panellist',
@@ -2137,6 +2475,14 @@ window.__ModuleLoader__.load({
             label: () => t('title'),
             locale: NS,
           }, PanelIcon))
+        ctx.slots.inject('sidebar.panellist', () =>
+          ctx.slots.register({
+            name: 'sidebar.panellist',
+            id: 'dsh-task-hub-mail',
+            order: 16,
+            label: () => t('mailTitle'),
+            locale: NS,
+          }, MailIcon))
       },
     }
   },

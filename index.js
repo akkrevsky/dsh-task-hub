@@ -16,12 +16,16 @@ import { randomUUID } from 'node:crypto'
 import {
   AccountsStore,
   connectAccount,
+  connectMail,
   deleteEventRemote,
+  mailCredentials,
   pushEvent,
   removeAccount,
+  removeMail,
   syncAccount,
   updateAccount,
 } from './accounts.js'
+import { listFolders, listMessages, readMessage } from './mail.js'
 
 const API_PREFIX = '/dsh-task-hub/api'
 const STORE_VERSION = 1
@@ -449,6 +453,47 @@ function createHandler(store, accountsStore) {
         const { account, accounts } = await connectAccount(accountsStore, body)
         return send(res, 200, { account, accounts, state: await store.read() })
       }
+      if (method === 'POST' && /^\/accounts\/[^/]+\/mail$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/accounts/'.length, -'/mail'.length))
+        const body = await readJson(req)
+        const { account, accounts } = await connectMail(accountsStore, id, body)
+        return send(res, 200, { account, accounts })
+      }
+      if (method === 'DELETE' && /^\/accounts\/[^/]+\/mail$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/accounts/'.length, -'/mail'.length))
+        const { account, accounts } = await removeMail(accountsStore, id)
+        return send(res, 200, { account, accounts })
+      }
+      if (path === '/mail/folders' && method === 'GET') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const { config, password } = await mailCredentials(accountsStore, url.searchParams.get('accountId'))
+        return send(res, 200, { folders: await listFolders(config, password) })
+      }
+      if (path === '/mail/messages' && method === 'GET') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const { config, password } = await mailCredentials(accountsStore, url.searchParams.get('accountId'))
+        const payload = await listMessages({
+          config,
+          password,
+          folder: url.searchParams.get('folder') || 'INBOX',
+          limit: url.searchParams.get('limit') || 40,
+        })
+        return send(res, 200, payload)
+      }
+      if (path === '/mail/message' && method === 'GET') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const { config, password } = await mailCredentials(accountsStore, url.searchParams.get('accountId'))
+        const payload = await readMessage({
+          config,
+          password,
+          folder: url.searchParams.get('folder') || 'INBOX',
+          uid: url.searchParams.get('uid'),
+        })
+        return send(res, 200, payload)
+      }
+
       if (method === 'POST' && /^\/accounts\/[^/]+\/sync$/.test(path)) {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         const id = decodeURIComponent(path.slice('/accounts/'.length, -'/sync'.length))

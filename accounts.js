@@ -8,6 +8,7 @@
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { MAIL_PRESETS, verifyMail } from './mail.js'
 import {
   PROVIDERS,
   buildIcsEvent,
@@ -39,7 +40,8 @@ export class AccountsStore {
     const secrets = await readJson(this.#secretsFile, { version: 1, accounts: {} })
     const accountsList = Array.isArray(accounts.accounts) ? accounts.accounts.filter(isObject) : []
     const secretsMap = isObject(secrets.accounts) ? secrets.accounts : {}
-    this.#data = { accounts: accountsList, secrets: secretsMap }
+    const mailSecrets = isObject(secrets.mail) ? secrets.mail : {}
+    this.#data = { accounts: accountsList, secrets: secretsMap, mailSecrets }
     return this.#data
   }
 
@@ -58,6 +60,11 @@ export class AccountsStore {
     return typeof data.secrets[id] === 'string' ? data.secrets[id] : null
   }
 
+  async mailPassword(id) {
+    const data = await this.#load()
+    return typeof data.mailSecrets[id] === 'string' ? data.mailSecrets[id] : null
+  }
+
   mutate(fn) {
     const run = async () => {
       const data = structuredClone(await this.#load())
@@ -73,7 +80,11 @@ export class AccountsStore {
   async #save(data) {
     await mkdir(this.#dir, { recursive: true, mode: 0o700 })
     await writeAtomic(this.#accountsFile, { version: 1, accounts: data.accounts })
-    await writeAtomic(this.#secretsFile, { version: 1, accounts: data.secrets }, SECRET_MODE)
+    await writeAtomic(this.#secretsFile, {
+      version: 1,
+      accounts: data.secrets,
+      mail: data.mailSecrets ?? {},
+    }, SECRET_MODE)
     // writeAtomic renames over the file, which resets the mode; enforce it.
     await chmod(this.#secretsFile, SECRET_MODE)
   }
@@ -112,7 +123,66 @@ function publicAccount(account) {
     error: account.error ?? null,
     lastSyncAt: account.lastSyncAt ?? null,
     importedAt: account.importedAt ?? null,
+    mail: account.mail
+      ? {
+        provider: account.mail.provider ?? 'custom',
+        host: account.mail.host ?? '',
+        port: account.mail.port ?? 993,
+        secure: account.mail.secure !== false,
+        username: account.mail.username ?? '',
+        status: account.mail.status ?? 'ok',
+        lastCheckAt: account.mail.lastCheckAt ?? null,
+      }
+      : null,
   }
+}
+
+/** Attach IMAP settings to an existing account after a login check. */
+export async function connectMail(accountsStore, id, input) {
+  const account = await accountsStore.get(id)
+  if (!account) throw new Error(`unknown account: ${id}`)
+  const provider = MAIL_PRESETS[input?.provider] ? input.provider : (MAIL_PRESETS[account.provider] ? account.provider : 'custom')
+  const preset = MAIL_PRESETS[provider]
+  const username = String(input?.username || account.username || '').trim()
+  const password = String(input?.password ?? '')
+  if (!username) throw new Error('укажите логин почты')
+  if (!password) throw new Error('укажите пароль приложения для почты')
+  const config = {
+    provider,
+    host: String(input?.host || preset.host || '').trim(),
+    port: Number(input?.port) || preset.port || 993,
+    secure: input?.secure !== false,
+    username,
+  }
+  await verifyMail(config, password)
+  const { result: updated, accounts } = await accountsStore.mutate(data => {
+    const found = data.accounts.find(item => item.id === id)
+    found.mail = { ...config, status: 'ok', lastCheckAt: new Date().toISOString() }
+    data.mailSecrets[id] = password
+    return found
+  })
+  return { account: publicAccount(updated), accounts }
+}
+
+export async function removeMail(accountsStore, id) {
+  const { result, accounts } = await accountsStore.mutate(data => {
+    const found = data.accounts.find(item => item.id === id)
+    if (!found) throw new Error(`unknown account: ${id}`)
+    delete found.mail
+    delete data.mailSecrets[id]
+    return found
+  })
+  return { account: publicAccount(result), accounts }
+}
+
+/** Resolve the account, its IMAP config and its mail password. */
+export async function mailCredentials(accountsStore, id) {
+  const account = await accountsStore.get(id)
+  if (!account) throw new Error(`unknown account: ${id}`)
+  if (!account.mail) throw new Error('для этого аккаунта почта не подключена')
+  const password = await accountsStore.mailPassword(id)
+  if (!password) throw new Error('нет пароля почты — подключите ящик заново')
+  return { account, config: account.mail, password }
 }
 
 /**
@@ -163,6 +233,7 @@ export async function removeAccount(accountsStore, id) {
   const { accounts } = await accountsStore.mutate(data => {
     data.accounts = data.accounts.filter(item => item.id !== id)
     delete data.secrets[id]
+    delete data.mailSecrets[id]
     return id
   })
   return { id, accounts }
