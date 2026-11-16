@@ -20,7 +20,10 @@ DeepSeek Harness left sidebar.
   Finishing a parent finishes its open children.
 - Calendar: month grid, week grid with positioned events, agenda; create an
   event by clicking a day or an hour; an event editor with date, time, all-day,
-  notes and a linked task.
+  notes and a linked task. A right rail shows the mini-month, connection status
+  and the next events.
+- Accounts tab: provider, login and app password, per-calendar toggles, sync
+  and remove — replacing the earlier drawer.
 - Task ↔ event link: "To calendar" in the task editor; deleting a task detaches
   its events; deleting an event keeps the task.
 - Storage: `$DSH_HOME/plugin-data/dsh-task-hub/tasks.json` (or

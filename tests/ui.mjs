@@ -43,6 +43,17 @@ let state = {
   updatedAt: iso(today),
 }
 
+const sampleAccount = {
+  id: 'acc-1',
+  provider: 'yandex',
+  username: 'me@example.com',
+  baseUrl: 'https://caldav.yandex.ru/',
+  calendars: [{ href: '/calendars/me/events/', title: 'Мои события', components: ['VEVENT'], selected: true }],
+  status: 'ok',
+  error: null,
+  lastSyncAt: iso(today),
+}
+
 const calls = []
 globalThis.fetch = async (url, options = {}) => {
   calls.push({ url, method: options.method ?? 'GET', body: options.body })
@@ -52,6 +63,12 @@ globalThis.fetch = async (url, options = {}) => {
     const event = { id: 'e2', title: body.title, notes: '', startAt: body.startAt, endAt: body.endAt, allDay: false, color: '#4D6BFE', taskId: body.taskId ?? null, createdAt: iso(today), updatedAt: iso(today) }
     state = { ...state, events: [...state.events, event] }
     return { ok: true, status: 200, text: async () => JSON.stringify({ state, event }) }
+  }
+  if (String(url).endsWith('/accounts') && method === 'GET') {
+    return { ok: true, status: 200, text: async () => JSON.stringify({ accounts: [sampleAccount] }) }
+  }
+  if (/\/accounts\/[^/]+\/sync$/.test(String(url)) && method === 'POST') {
+    return { ok: true, status: 200, text: async () => JSON.stringify({ state, account: sampleAccount, imported: 0, removed: 0 }) }
   }
   return { ok: true, status: 200, text: async () => JSON.stringify(state) }
 }
@@ -152,5 +169,19 @@ await tick()
 const linkedPost = calls.filter(call => call.method === 'POST').find(call => JSON.parse(call.body).taskId === 't1')
 if (!linkedPost) throw new Error('task → calendar did not create a linked event')
 
-console.log('ok: lists, month/week/agenda render, day click creates an event, event drawer opens, task → calendar links')
+// accounts tab
+const accountsTab = [...document.querySelectorAll('button')].find(b => b.textContent === 'Аккаунты')
+if (!accountsTab) throw new Error('accounts tab missing')
+click(accountsTab)
+await tick()
+if (!text().includes('Добавить аккаунт')) throw new Error('accounts page did not render the add form')
+if (!text().includes('me@example.com')) throw new Error('connected account is not listed')
+const syncButton = [...document.querySelectorAll('button')].find(b => b.textContent === 'Синхронизировать')
+if (!syncButton) throw new Error('sync button missing on the account card')
+click(syncButton)
+await tick()
+await tick()
+if (!calls.some(call => /\/accounts\/[^/]+\/sync$/.test(String(call.url)))) throw new Error('sync did not call the API')
+
+console.log('ok: lists, month/week/agenda render, day click creates an event, event drawer opens, task → calendar links, accounts tab')
 console.log('calls:', calls.map(c => `${c.method} ${String(c.url).replace('http://127.0.0.1:3080', '')}`).join(', '))
