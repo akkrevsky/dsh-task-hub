@@ -22,11 +22,25 @@ const fakeWindow = {
   },
 }
 
-// Minimal React surface: the bundle only needs createElement.
+// Minimal React surface. Hooks are inert stubs: rendering the panel here must
+// not schedule effects, fetch data or depend on a browser.
 const React = {
   createElement(type, props, ...children) {
     const resolved = children.length > 1 ? children : children[0]
     return { type, props: props ?? {}, children: resolved }
+  },
+  useState(initial) {
+    return [typeof initial === 'function' ? initial() : initial, () => {}]
+  },
+  useEffect() {},
+  useMemo(fn) {
+    return fn()
+  },
+  useCallback(fn) {
+    return fn
+  },
+  useRef() {
+    return { current: null }
   },
 }
 
@@ -82,8 +96,10 @@ assert.equal(typeof rail.options.order, 'number')
 assert.equal(rail.options.label(), 'Задачи', 'label comes from the ru dictionary')
 
 // Both halves of the rail entry must render without throwing.
-const panel = main.component({ t: key => dictionaries.ru[key] ?? key })
+const t = key => dictionaries.ru[key] ?? dictionaries.en[key] ?? key
+const panel = main.component({ t })
 assert.ok(panel, 'panel component must render')
+assert.ok(panel.children, 'panel renders a tree')
 const icon = rail.component({ size: 18, active: true })
 assert.ok(icon, 'rail icon must render')
 

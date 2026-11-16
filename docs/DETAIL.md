@@ -3,26 +3,40 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M0 — scaffold.** The bundle registers a rail entry and an empty
-> workspace panel. Task lists, the tree, calendars and mail are not implemented
-> yet; the roadmap below is the plan, not a description of current behaviour.
+> **Status: M1 — local tasks.** Lists, a task tree, subtasks, due dates, tags
+> and an editor work on a local JSON store, and three agent tools share it.
+> Calendars, providers and mail are not implemented yet; the roadmap below is
+> the plan, not a description of current behaviour.
 
 ## What works today
 
-- `sidebar.panellist` — a **Tasks** row in the left rail, ordered after the
-  built-in destinations.
-- `main` keyed by `dsh-task-hub` — the workspace panel the row opens.
+- `sidebar.panellist` — a **Tasks** row in the left rail; `main` keyed by
+  `dsh-task-hub` — the workspace panel it opens.
+- Smart filters (All / Today / Upcoming / Someday / Done) and user lists with
+  colours, counts, rename-free creation.
+- Two views: **Lists** (grouped by due date) and **Tree** (subtasks, collapse,
+  parent progress).
+- Editor: title, due date, priority, list, tags, notes, subtasks, delete.
+  Finishing a parent finishes its open children.
+- Storage: `$DSH_HOME/plugin-data/dsh-task-hub/tasks.json` (or
+  `DSH_TASK_HUB_STORE`), written through a temporary file and `rename()`.
+- HTTP API under `/dsh-task-hub/api` and agent tools `tasks_list`,
+  `tasks_create`, `tasks_update`.
 - Client strings for `en` and `ru`; the UI follows the host theme through
   `--dsw-alias-*` tokens.
 
-Everything else on this page is planned.
+## Limitations
+
+- No calendar view yet (M2), no provider sync (M3–M4), no mail (M5).
+- Single user, single profile: no sharing, no conflict resolution.
+- The store is a plain JSON file; it is not a database and has no history.
 
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
-| M0 (current) | Bundle, rail entry, panel, locale, packaging |
-| M1 | Local lists, tree, subtasks, due dates, tags, JSON store, agent tools |
+| M0 ✅ | Bundle, rail entry, panel, locale, packaging |
+| M1 ✅ | Local lists, tree, subtasks, due dates, tags, JSON store, agent tools |
 | M2 | Calendar views (month / week / agenda) on local data, task ↔ event link |
 | M3 | CalDAV sync: Yandex (`caldav.yandex.ru`) and Mail.ru, two-way, conflict list |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
@@ -36,12 +50,6 @@ dsh plugin --profile web add github:akkrevsky/dsh-task-hub
 ```
 
 Then hard-refresh the page (Cmd/Ctrl+Shift+R). Requires DSH 0.2.2-rc.2 or newer.
-
-## Limitations
-
-- No data is stored or synced yet: the panel is a placeholder.
-- No agent tools are registered.
-- No network access: the host half is an empty `apply()`.
 
 ## Design notes
 
