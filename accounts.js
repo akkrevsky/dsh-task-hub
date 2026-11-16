@@ -132,7 +132,9 @@ export async function connectAccount(accountsStore, input) {
       title: calendar.title,
       color: preset.color,
       components: calendar.components,
-      selected: true,
+      // A VTODO-only collection holds tasks, not events: keep it visible but
+      // out of the VEVENT sync until task sync exists.
+      selected: calendar.components.length === 0 || calendar.components.includes('VEVENT'),
     })),
     status: 'ok',
     error: null,
@@ -197,7 +199,8 @@ export async function syncAccount({ accountsStore, taskStore, id, window: range 
   if (!password) throw new Error('для аккаунта нет пароля — переподключите его')
 
   const { from, to } = range ?? syncWindow()
-  const selected = (account.calendars ?? []).filter(calendar => calendar.selected !== false)
+  const selected = (account.calendars ?? []).filter(calendar => calendar.selected !== false
+    && (calendar.components?.length === 0 || calendar.components?.includes('VEVENT')))
   if (selected.length === 0) throw new Error('не выбран ни один календарь')
 
   const imported = []

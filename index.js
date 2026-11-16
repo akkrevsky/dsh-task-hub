@@ -665,8 +665,9 @@ function registerTools(ctx, store) {
 
   const agendaTool = {
     name: 'calendar_agenda',
-    description: 'Read the Task Hub calendar for a date range: local events plus tasks whose due date '
-      + 'falls inside the range. Defaults to the next 7 days. The calendar has no external provider sync yet.',
+    description: 'Read the Task Hub calendar for a date range: local events, events imported from CalDAV '
+      + '(Yandex/Mail.ru) plus tasks whose due date falls inside the range. Defaults to the next 7 days. '
+      + 'Provider events are read-only in Task Hub.',
     parameters: {
       type: 'object',
       additionalProperties: false,
