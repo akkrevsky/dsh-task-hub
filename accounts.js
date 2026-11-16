@@ -13,6 +13,7 @@ import {
   buildIcsEvent,
   deleteResource,
   discover,
+  fetchEtag,
   fetchRange,
   putResource,
 } from './caldav.js'
@@ -328,14 +329,22 @@ export async function pushEvent({ accountsStore, taskStore, id, accountId, calen
     endAt: event.endAt,
     allDay: event.allDay,
   })
-  const { etag } = await putResource({
+  // Yandex (and some other servers) do not return an ETag on PUT, so a
+  // provider-backed event may have href but no etag yet: read it first and
+  // fall back to a create-only write only when the resource is really absent.
+  let etag = event.source?.etag ?? null
+  if (!etag && event.source?.href) {
+    etag = await fetchEtag({ baseUrl: account.baseUrl, username: account.username, password, href })
+  }
+  const write = await putResource({
     baseUrl: account.baseUrl,
     username: account.username,
     password,
     href,
     body,
-    etag: event.source?.etag ?? null,
+    etag,
   })
+  const finalEtag = write.etag ?? await fetchEtag({ baseUrl: account.baseUrl, username: account.username, password, href })
   const { state: nextState } = await taskStore.mutate(draft => {
     const target = draft.events.find(item => item.id === id)
     target.source = {
@@ -343,7 +352,7 @@ export async function pushEvent({ accountsStore, taskStore, id, accountId, calen
       calendarId: calendar.href,
       calendarTitle: calendar.title,
       href,
-      etag,
+      etag: finalEtag,
       uid,
     }
     target.color = calendar.color || target.color

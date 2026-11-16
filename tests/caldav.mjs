@@ -240,6 +240,30 @@ assert.equal(writes[2].method, 'DELETE')
 assert.equal(writes[2].headers['if-match'], '"etag-new"')
 assert.equal((await taskStore.read()).events.find(item => item.id === pushId), undefined)
 
+// Servers that omit ETag on PUT: read it back with PROPFIND.
+const lateEvent = await taskStore.mutate(draft => createEvent(draft, {
+  title: 'Без etag',
+  startAt: '2026-11-27T09:00:00Z',
+}))
+const lateWrites = []
+globalThis.fetch = async (url, options = {}) => {
+  const method = options.method ?? 'GET'
+  lateWrites.push(method)
+  if (method === 'PUT') return { ok: true, status: 201, headers: { get: () => null }, text: async () => '' }
+  if (method === 'PROPFIND') {
+    return {
+      ok: true,
+      status: 207,
+      text: async () => '<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop>'
+        + '<d:getetag>"etag-late"</d:getetag></d:prop></d:propstat></d:response></d:multistatus>',
+    }
+  }
+  throw new Error(`unexpected request: ${method}`)
+}
+const late = await pushEvent({ accountsStore, taskStore, id: lateEvent.result.id, accountId: account.id })
+assert.ok(lateWrites.includes('PROPFIND'), 'the ETag is read back when PUT does not return one')
+assert.equal(late.event.source.etag, '"etag-late"')
+
 // A concurrent edit on the server must surface as a conflict.
 const conflictEvent = await taskStore.mutate(draft => createEvent(draft, {
   title: 'Конфликт',

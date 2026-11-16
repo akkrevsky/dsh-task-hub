@@ -264,6 +264,26 @@ export async function putResource({ baseUrl, username, password, href, body, eta
   return { etag: result.etag }
 }
 
+/** Read one resource ETag; null when the resource is gone. */
+export async function fetchEtag({ baseUrl, username, password, href }) {
+  const base = normalizeBase(baseUrl)
+  const url = resolveUrl(base, href)
+  const response = await fetch(url, {
+    method: 'PROPFIND',
+    headers: {
+      authorization: basicAuth(username, password),
+      'content-type': 'application/xml; charset=utf-8',
+      depth: '0',
+    },
+    body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>',
+  })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`PROPFIND → HTTP ${response.status}`)
+  const text = await response.text()
+  const match = /<(?:[\w-]+:)?getetag\b[^>]*>([\s\S]*?)<\/(?:[\w-]+:)?getetag>/i.exec(text)
+  return match ? decodeXml(match[1].trim()) : null
+}
+
 /** DELETE one resource; a missing resource is not an error. */
 export async function deleteResource({ baseUrl, username, password, href, etag }) {
   const base = normalizeBase(baseUrl)
