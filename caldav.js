@@ -228,6 +228,58 @@ function toUtcStamp(value) {
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 }
 
+/* ------------------------------------------------------------------- writes */
+
+async function writeRequest({ baseUrl, username, password, method, url, body, headers = {} }) {
+  const response = await fetch(url, {
+    method,
+    headers: { authorization: basicAuth(username, password), ...headers },
+    body,
+  })
+  if (response.status === 401 || response.status === 403) throw new Error('сервер отклонил логин или пароль (401)')
+  if (response.status === 412 || response.status === 409) throw new Error('конфликт: событие уже изменили на сервере')
+  if (response.status === 404) return { status: 404, etag: null }
+  if (!response.ok && response.status !== 201 && response.status !== 204) {
+    throw new Error(`${method} → HTTP ${response.status}`)
+  }
+  return { status: response.status, etag: response.headers.get('etag') ?? null }
+}
+
+/** PUT one iCalendar resource. Without an ETag the write is create-only. */
+export async function putResource({ baseUrl, username, password, href, body, etag }) {
+  const base = normalizeBase(baseUrl)
+  const headers = { 'content-type': 'text/calendar; charset=utf-8' }
+  if (etag) headers['if-match'] = etag
+  else headers['if-none-match'] = '*'
+  const result = await writeRequest({
+    baseUrl: base,
+    username,
+    password,
+    method: 'PUT',
+    url: resolveUrl(base, href),
+    body,
+    headers,
+  })
+  if (result.status === 404) throw new Error('календарь не найден (404)')
+  return { etag: result.etag }
+}
+
+/** DELETE one resource; a missing resource is not an error. */
+export async function deleteResource({ baseUrl, username, password, href, etag }) {
+  const base = normalizeBase(baseUrl)
+  const headers = {}
+  if (etag) headers['if-match'] = etag
+  const result = await writeRequest({
+    baseUrl: base,
+    username,
+    password,
+    method: 'DELETE',
+    url: resolveUrl(base, href),
+    headers,
+  })
+  return { status: result.status }
+}
+
 /* ----------------------------------------------------------------------- ics */
 
 const pad = n => String(n).padStart(2, '0')

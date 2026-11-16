@@ -67,6 +67,24 @@ globalThis.fetch = async (url, options = {}) => {
   if (String(url).endsWith('/accounts') && method === 'GET') {
     return { ok: true, status: 200, text: async () => JSON.stringify({ accounts: [sampleAccount] }) }
   }
+  if (/\/events\/[^/]+\/push$/.test(String(url)) && method === 'POST') {
+    const id = String(url).split('/events/')[1].split('/push')[0]
+    const body = JSON.parse(options.body || '{}')
+    const event = state.events.find(item => item.id === id)
+    const updated = {
+      ...event,
+      source: {
+        accountId: body.accountId,
+        calendarId: body.calendarHref,
+        calendarTitle: 'Мои события',
+        href: '/calendars/me/events/x.ics',
+        etag: '"e1"',
+        uid: 'u1',
+      },
+    }
+    state = { ...state, events: state.events.map(item => (item.id === id ? updated : item)) }
+    return { ok: true, status: 200, text: async () => JSON.stringify({ state, event: updated }) }
+  }
   if (/\/accounts\/[^/]+\/sync$/.test(String(url)) && method === 'POST') {
     return { ok: true, status: 200, text: async () => JSON.stringify({ state, account: sampleAccount, imported: 0, removed: 0 }) }
   }
@@ -149,6 +167,15 @@ if (chips.length === 0) throw new Error('event chip not clickable')
 click(chips[0])
 await tick()
 if (!text().includes('Связанная задача')) throw new Error('event drawer fields missing')
+
+const pushButton = [...document.querySelectorAll('button')].find(b => b.textContent === 'Отправить')
+if (!pushButton) throw new Error('push-to-calendar button missing on a local event')
+click(pushButton)
+await tick()
+await tick()
+if (!calls.some(call => /\/events\/[^/]+\/push$/.test(String(call.url)))) {
+  throw new Error('push did not call the API')
+}
 
 // close the event drawer, then link a task to a new event
 const closeBtn = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Закрыть')

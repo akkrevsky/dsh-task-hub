@@ -93,6 +93,9 @@ window.__ModuleLoader__.load({
       ceSave: 'Save',
       ceFromTask: 'To calendar',
       ceLinked: 'In calendar',
+      pushTo: 'Send to calendar',
+      pushNow: 'Send',
+      pushDone: 'Sent',
       ceImported: 'Imported from a provider — read-only here',
       connections: 'Connections',
       accountsTitle: 'Accounts',
@@ -191,6 +194,9 @@ window.__ModuleLoader__.load({
       ceSave: 'Сохранить',
       ceFromTask: 'В календарь',
       ceLinked: 'В календаре',
+      pushTo: 'Отправить в календарь',
+      pushNow: 'Отправить',
+      pushDone: 'Отправлено',
       ceImported: 'Импортировано из провайдера — здесь только чтение',
       connections: 'Подключения',
       accountsTitle: 'Аккаунты',
@@ -1051,8 +1057,15 @@ window.__ModuleLoader__.load({
     }
 
     function EventDrawer(props) {
-      const { event, tasks, t, onClose, onSave, onDelete, onOpenTask } = props
+      const { event, tasks, accounts, t, onClose, onSave, onDelete, onOpenTask, onPush } = props
       const readOnly = Boolean(event.source)
+      const targets = (accounts ?? []).flatMap(account => (account.calendars ?? [])
+        .filter(calendar => (calendar.components?.length === 0 || calendar.components?.includes('VEVENT')))
+        .map(calendar => ({
+          value: `${account.id}|${calendar.href}`,
+          label: `${(PROVIDER[account.provider] || PROVIDER.caldav).label} · ${calendar.title}`,
+        })))
+      const [pushTarget, setPushTarget] = useState(targets[0]?.value ?? '')
       const [title, setTitle] = useState(event.title)
       const [date, setDate] = useState(dayKey(new Date(event.startAt)))
       const [start, setStart] = useState(hhmm(event.startAt))
@@ -1134,17 +1147,32 @@ window.__ModuleLoader__.load({
         h('div', { style: S.field },
           h('label', { style: S.label }, t('notes')),
           h('textarea', { style: { ...S.fieldInput, ...S.textarea }, value: notes, disabled: readOnly, onChange: e => setNotes(e.target.value) })),
-        readOnly
+        readOnly || targets.length === 0
           ? null
-          : h('div', { style: { ...S.row2, marginBottom: 12 } },
-            h('button', { type: 'button', style: S.primaryBtn, onClick: save }, t('ceSave')),
+          : h('div', { style: { ...S.field, paddingTop: 4 } },
+            h('label', { style: S.label }, t('pushTo')),
+            h('select', {
+              style: S.fieldInput,
+              value: pushTarget,
+              onChange: e => setPushTarget(e.target.value),
+            }, targets.map(target => h('option', { key: target.value, value: target.value }, target.label))),
             h('button', {
               type: 'button',
-              style: S.dangerBtn,
-              onClick: () => {
-                if (window.confirm(t('ceDelete') + '?')) onDelete(event.id)
-              },
-            }, t('ceDelete'))))
+              style: { ...S.ghostBtn, marginTop: 8 },
+              disabled: !pushTarget,
+              onClick: () => onPush(event.id, pushTarget),
+            }, t('pushNow'))),
+        h('div', { style: { ...S.row2, marginBottom: 12 } },
+          readOnly
+            ? null
+            : h('button', { type: 'button', style: S.primaryBtn, onClick: save }, t('ceSave')),
+          h('button', {
+            type: 'button',
+            style: S.dangerBtn,
+            onClick: () => {
+              if (window.confirm(t('ceDelete') + '?')) onDelete(event.id)
+            },
+          }, t('ceDelete'))))
     }
 
     /* ------------------------------------------------------------- calendar */
@@ -1719,6 +1747,15 @@ window.__ModuleLoader__.load({
 
       const saveEvent = async (id, patch) => mutate(`/events/${id}`, 'PATCH', patch)
 
+      const pushEventToCalendar = async (id, target) => {
+        if (!target) return
+        const separator = target.indexOf('|')
+        const accountId = target.slice(0, separator)
+        const calendarHref = target.slice(separator + 1)
+        const payload = await mutate(`/events/${id}/push`, 'POST', { accountId, calendarHref })
+        if (payload?.event) setSelectedEventId(payload.event.id)
+      }
+
       const removeEvent = async id => {
         await mutate(`/events/${id}`, 'DELETE')
         setSelectedEventId(null)
@@ -1939,11 +1976,13 @@ window.__ModuleLoader__.load({
           ? h(EventDrawer, {
             event: selectedEvent,
             tasks,
+            accounts,
             t,
             onClose: () => setSelectedEventId(null),
             onSave: saveEvent,
             onDelete: removeEvent,
             onOpenTask: openTaskFromCalendar,
+            onPush: pushEventToCalendar,
           })
           : selected
             ? h(TaskDrawer, {

@@ -8,7 +8,14 @@
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { PROVIDERS, discover, fetchRange } from './caldav.js'
+import {
+  PROVIDERS,
+  buildIcsEvent,
+  deleteResource,
+  discover,
+  fetchRange,
+  putResource,
+} from './caldav.js'
 
 const SECRET_MODE = 0o600
 
@@ -290,6 +297,85 @@ export async function syncAccount({ accountsStore, taskStore, id, window: range 
     imported: counts.inserted,
     removed: counts.removed,
   }
+}
+
+/**
+ * Write one Task Hub event into a CalDAV calendar.
+ * A local event becomes provider-backed; a provider event is updated with its
+ * ETag, so a concurrent edit on the server fails with a conflict instead of
+ * overwriting it.
+ */
+export async function pushEvent({ accountsStore, taskStore, id, accountId, calendarHref }) {
+  const account = await accountsStore.get(accountId)
+  if (!account) throw new Error(`unknown account: ${accountId}`)
+  const password = await accountsStore.password(accountId)
+  if (!password) throw new Error('для аккаунта нет пароля — переподключите его')
+  const state = await taskStore.read()
+  const event = state.events.find(item => item.id === id)
+  if (!event) throw new Error(`unknown event: ${id}`)
+  const calendar = account.calendars.find(item => item.href === calendarHref)
+    ?? account.calendars.find(item => item.selected !== false
+      && (item.components?.length === 0 || item.components?.includes('VEVENT')))
+  if (!calendar) throw new Error('в аккаунте нет календаря для событий')
+
+  const uid = event.source?.uid ?? `${id}@dsh-task-hub`
+  const href = event.source?.href ?? `${calendar.href}${encodeURIComponent(uid)}.ics`
+  const body = buildIcsEvent({
+    uid,
+    title: event.title,
+    notes: event.notes,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    allDay: event.allDay,
+  })
+  const { etag } = await putResource({
+    baseUrl: account.baseUrl,
+    username: account.username,
+    password,
+    href,
+    body,
+    etag: event.source?.etag ?? null,
+  })
+  const { state: nextState } = await taskStore.mutate(draft => {
+    const target = draft.events.find(item => item.id === id)
+    target.source = {
+      accountId,
+      calendarId: calendar.href,
+      calendarTitle: calendar.title,
+      href,
+      etag,
+      uid,
+    }
+    target.color = calendar.color || target.color
+    target.updatedAt = new Date().toISOString()
+    return target
+  })
+  return { state: nextState, event: nextState.events.find(item => item.id === id) }
+}
+
+/** Delete one event locally, and on the provider when it came from there. */
+export async function deleteEventRemote({ accountsStore, taskStore, id }) {
+  const state = await taskStore.read()
+  const event = state.events.find(item => item.id === id)
+  if (!event) throw new Error(`unknown event: ${id}`)
+  if (event.source?.accountId) {
+    const account = await accountsStore.get(event.source.accountId)
+    const password = account ? await accountsStore.password(account.id) : null
+    if (account && password) {
+      await deleteResource({
+        baseUrl: account.baseUrl,
+        username: account.username,
+        password,
+        href: event.source.href,
+        etag: event.source.etag,
+      })
+    }
+  }
+  const { state: nextState } = await taskStore.mutate(draft => {
+    draft.events = draft.events.filter(item => item.id !== id)
+    return null
+  })
+  return { state: nextState }
 }
 
 export { PROVIDERS }

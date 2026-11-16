@@ -13,7 +13,7 @@ import {
   parseIcsDate,
   zonedWallToUtc,
 } from '../caldav.js'
-import { AccountsStore, connectAccount, syncAccount } from '../accounts.js'
+import { AccountsStore, connectAccount, deleteEventRemote, pushEvent, syncAccount } from '../accounts.js'
 import { TaskStore, createEvent, createTask } from '../index.js'
 
 const dir = await mkdtemp(join(tmpdir(), 'dsh-task-hub-caldav-'))
@@ -198,5 +198,58 @@ assert.equal(third.removed, 3, 'events gone from the server are removed')
 assert.equal(third.state.events.length, 1, 'local event survives')
 assert.equal(third.state.events[0].title, 'Локальное событие')
 
-console.log('ok: ics parse, TZID/DST, discovery, report, secrets 0600 and pull sync')
+/* --------------------------------------------------------- push + delete */
+
+const pushedEvent = await taskStore.mutate(draft => createEvent(draft, {
+  title: 'К отправке',
+  startAt: '2026-11-25T09:00:00Z',
+  endAt: '2026-11-25T10:00:00Z',
+}))
+const pushId = pushedEvent.result.id
+
+const writes = []
+globalThis.fetch = async (url, options = {}) => {
+  const method = options.method ?? 'GET'
+  writes.push({ method, url: String(url), headers: options.headers ?? {}, body: options.body })
+  if (method === 'PUT') {
+    return {
+      ok: true,
+      status: 201,
+      headers: { get: name => (name.toLowerCase() === 'etag' ? '"etag-new"' : null) },
+      text: async () => '',
+    }
+  }
+  if (method === 'DELETE') {
+    return { ok: true, status: 204, headers: { get: () => null }, text: async () => '' }
+  }
+  throw new Error(`unexpected request: ${method} ${url}`)
+}
+
+const pushed = await pushEvent({ accountsStore, taskStore, id: pushId, accountId: account.id })
+assert.equal(writes[0].method, 'PUT')
+assert.equal(writes[0].headers['if-none-match'], '*', 'a new event is create-only')
+assert.match(writes[0].body, /SUMMARY:К отправке/, 'the VEVENT carries the title')
+assert.match(writes[0].body, /DTSTART:20261125T090000Z/)
+assert.equal(pushed.event.source.etag, '"etag-new"', 'the ETag is stored for update guards')
+
+await pushEvent({ accountsStore, taskStore, id: pushId, accountId: account.id })
+assert.equal(writes[1].headers['if-match'], '"etag-new"', 'an update uses If-Match')
+
+await deleteEventRemote({ accountsStore, taskStore, id: pushId })
+assert.equal(writes[2].method, 'DELETE')
+assert.equal(writes[2].headers['if-match'], '"etag-new"')
+assert.equal((await taskStore.read()).events.find(item => item.id === pushId), undefined)
+
+// A concurrent edit on the server must surface as a conflict.
+const conflictEvent = await taskStore.mutate(draft => createEvent(draft, {
+  title: 'Конфликт',
+  startAt: '2026-11-26T09:00:00Z',
+}))
+globalThis.fetch = async () => ({ ok: false, status: 412, headers: { get: () => null }, text: async () => '' })
+await assert.rejects(
+  () => pushEvent({ accountsStore, taskStore, id: conflictEvent.result.id, accountId: account.id }),
+  /конфликт/,
+)
+
+console.log('ok: ics parse, TZID/DST, discovery, report, secrets 0600, pull sync, push and delete')
 await rm(dir, { recursive: true, force: true })

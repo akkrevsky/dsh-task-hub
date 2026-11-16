@@ -3,10 +3,10 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M3 (pull) — local tasks, calendar and CalDAV import.** Lists, a task
-> tree, a calendar and Yandex / Mail.ru / generic CalDAV accounts: provider
-> events are imported for a date range and shown read-only. Writing back (push),
-> Google Calendar (OAuth) and mail are not implemented yet.
+> **Status: M3 — task calendar with two-way CalDAV.** Lists, a task tree, a
+> calendar and Yandex / Mail.ru / generic CalDAV accounts: provider events are
+> imported and Task Hub events are written back with ETag guards. Google
+> Calendar (OAuth), VTODO sync and mail are not implemented yet.
 
 ## What works today
 
@@ -39,7 +39,8 @@ DeepSeek Harness left sidebar.
 
 ## Limitations
 
-- CalDAV is read-only: imported events are not written back yet.
+- Imported events open read-only; edit-back of an existing provider event is the next step.
+- Deleting an imported event deletes it on the provider too.
 - Google Calendar (M4) and mail (M5) are not implemented.
 - The week view shows a 24-hour grid without drag-and-drop resizing.
 - Single user, single profile: no sharing, no conflict resolution.
@@ -52,8 +53,8 @@ DeepSeek Harness left sidebar.
 | M0 ✅ | Bundle, rail entry, panel, locale, packaging |
 | M1 ✅ | Local lists, tree, subtasks, due dates, tags, JSON store, agent tools |
 | M2 ✅ | Calendar views (month / week / agenda) on local data, task ↔ event link |
-| M3 (pull) ✅ | CalDAV import: Yandex and Mail.ru, discovery, iCalendar reader, read-only events |
-| M3 (push) | Write events back with ETag guards and a conflict list |
+| M3 (pull) ✅ | CalDAV import: Yandex and Mail.ru, discovery, iCalendar reader |
+| M3 (push) ✅ | Create/update/delete events with If-None-Match/If-Match, conflict surfaced as an error |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
 | M5 | Mail over IMAP for Gmail / Yandex / Mail.ru, "turn a message into a task" |
 | M6 | Agent tools for calendar and mail, SMTP with explicit confirmation, polish |

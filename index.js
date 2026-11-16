@@ -13,7 +13,15 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
-import { AccountsStore, connectAccount, removeAccount, syncAccount, updateAccount } from './accounts.js'
+import {
+  AccountsStore,
+  connectAccount,
+  deleteEventRemote,
+  pushEvent,
+  removeAccount,
+  syncAccount,
+  updateAccount,
+} from './accounts.js'
 
 const API_PREFIX = '/dsh-task-hub/api'
 const STORE_VERSION = 1
@@ -495,8 +503,25 @@ function createHandler(store, accountsStore) {
       }
       if (method === 'DELETE' && /^\/events\/[^/]+$/.test(path)) {
         const id = decodeURIComponent(path.slice('/events/'.length))
+        if (accountsStore) {
+          const { state } = await deleteEventRemote({ accountsStore, taskStore: store, id })
+          return send(res, 200, { state })
+        }
         const { state } = await store.mutate(draft => deleteEvent(draft, id))
         return send(res, 200, { state })
+      }
+      if (method === 'POST' && /^\/events\/[^/]+\/push$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/events/'.length, -'/push'.length))
+        const body = await readJson(req)
+        const result = await pushEvent({
+          accountsStore,
+          taskStore: store,
+          id,
+          accountId: body.accountId,
+          calendarHref: body.calendarHref,
+        })
+        return send(res, 200, result)
       }
 
       if (method === 'POST' && path === '/lists') {
