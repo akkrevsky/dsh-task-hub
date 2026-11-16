@@ -3,10 +3,10 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M2 — local tasks and calendar.** Lists, a task tree, subtasks, due
-> dates, tags, an editor and a calendar (month / week / agenda) work on a local
-> JSON store; four agent tools share it. Provider sync (Google/Yandex/Mail.ru)
-> and mail are not implemented yet; the roadmap below is the plan.
+> **Status: M3 (pull) — local tasks, calendar and CalDAV import.** Lists, a task
+> tree, a calendar and Yandex / Mail.ru / generic CalDAV accounts: provider
+> events are imported for a date range and shown read-only. Writing back (push),
+> Google Calendar (OAuth) and mail are not implemented yet.
 
 ## What works today
 
@@ -27,12 +27,17 @@ DeepSeek Harness left sidebar.
   `DSH_TASK_HUB_STORE`), written through a temporary file and `rename()`.
 - HTTP API under `/dsh-task-hub/api` and agent tools `tasks_list`,
   `tasks_create`, `tasks_update`, `calendar_agenda`.
+- CalDAV accounts: discovery, `calendar-query` REPORT over −30…+180 days, an
+  iCalendar reader for VEVENT (TZID/DST via `Intl`, all-day, DURATION), and a
+  read-only badge in the event editor. Passwords live in `secrets.json` (0600)
+  and never reach the browser.
 - Client strings for `en` and `ru`; the UI follows the host theme through
   `--dsw-alias-*` tokens.
 
 ## Limitations
 
-- No provider sync (M3–M4) and no mail (M5): the calendar holds local events only.
+- CalDAV is read-only: imported events are not written back yet.
+- Google Calendar (M4) and mail (M5) are not implemented.
 - The week view shows a 24-hour grid without drag-and-drop resizing.
 - Single user, single profile: no sharing, no conflict resolution.
 - The store is a plain JSON file; it is not a database and has no history.
@@ -44,7 +49,8 @@ DeepSeek Harness left sidebar.
 | M0 ✅ | Bundle, rail entry, panel, locale, packaging |
 | M1 ✅ | Local lists, tree, subtasks, due dates, tags, JSON store, agent tools |
 | M2 ✅ | Calendar views (month / week / agenda) on local data, task ↔ event link |
-| M3 | CalDAV sync: Yandex (`caldav.yandex.ru`) and Mail.ru, two-way, conflict list |
+| M3 (pull) ✅ | CalDAV import: Yandex and Mail.ru, discovery, iCalendar reader, read-only events |
+| M3 (push) | Write events back with ETag guards and a conflict list |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
 | M5 | Mail over IMAP for Gmail / Yandex / Mail.ru, "turn a message into a task" |
 | M6 | Agent tools for calendar and mail, SMTP with explicit confirmation, polish |

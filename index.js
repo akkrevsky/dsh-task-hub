@@ -13,6 +13,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
+import { AccountsStore, connectAccount, removeAccount, syncAccount, updateAccount } from './accounts.js'
 
 const API_PREFIX = '/dsh-task-hub/api'
 const STORE_VERSION = 1
@@ -97,6 +98,18 @@ function normalize(raw) {
         taskId: typeof event.taskId === 'string' && taskIds.has(event.taskId) ? event.taskId : null,
         createdAt: isIsoDate(event.createdAt) ? event.createdAt : new Date().toISOString(),
         updatedAt: isIsoDate(event.updatedAt) ? event.updatedAt : new Date().toISOString(),
+        ...(isPlainObject(event.source)
+          ? {
+            source: {
+              accountId: String(event.source.accountId ?? ''),
+              calendarId: String(event.source.calendarId ?? ''),
+              calendarTitle: typeof event.source.calendarTitle === 'string' ? event.source.calendarTitle : '',
+              href: String(event.source.href ?? ''),
+              etag: typeof event.source.etag === 'string' ? event.source.etag : null,
+              uid: typeof event.source.uid === 'string' ? event.source.uid : null,
+            },
+          }
+          : {}),
       }
     })
   }
@@ -409,7 +422,7 @@ function readJson(req) {
   })
 }
 
-function createHandler(store) {
+function createHandler(store, accountsStore) {
   return async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://dsh.internal')
@@ -417,6 +430,40 @@ function createHandler(store) {
       const method = req.method ?? 'GET'
 
       if (method === 'GET' && (path === '/state' || path === '/')) return send(res, 200, await store.read())
+
+      if (path === '/accounts' && method === 'GET') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        return send(res, 200, { accounts: await accountsStore.list() })
+      }
+      if (path === '/accounts' && method === 'POST') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const body = await readJson(req)
+        const { account, accounts } = await connectAccount(accountsStore, body)
+        return send(res, 200, { account, accounts, state: await store.read() })
+      }
+      if (method === 'POST' && /^\/accounts\/[^/]+\/sync$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/accounts/'.length, -'/sync'.length))
+        const result = await syncAccount({ accountsStore, taskStore: store, id })
+        return send(res, 200, result)
+      }
+      if (method === 'PATCH' && /^\/accounts\/[^/]+$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/accounts/'.length))
+        const body = await readJson(req)
+        const { account, accounts } = await updateAccount(accountsStore, id, body)
+        return send(res, 200, { account, accounts, state: await store.read() })
+      }
+      if (method === 'DELETE' && /^\/accounts\/[^/]+$/.test(path)) {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const id = decodeURIComponent(path.slice('/accounts/'.length))
+        await removeAccount(accountsStore, id)
+        const { state } = await store.mutate(draft => {
+          draft.events = draft.events.filter(event => event.source?.accountId !== id)
+          return null
+        })
+        return send(res, 200, { state })
+      }
 
       if (method === 'POST' && path === '/tasks') {
         const body = await readJson(req)
@@ -664,12 +711,13 @@ export const inject = ['webServer', 'tools']
 
 export function apply(ctx) {
   const store = new TaskStore(storeFile())
+  const accountsStore = new AccountsStore(dirname(storeFile()))
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: API_PREFIX,
-    handler: createHandler(store),
+    handler: createHandler(store, accountsStore),
   }))
   registerTools(ctx, store)
 }
 
-export { TaskStore, createEvent, createHandler, createList, createTask, deleteEvent, deleteList, deleteTask, emptyState, normalize, updateEvent, updateList, updateTask }
+export { AccountsStore, TaskStore, createEvent, createHandler, createList, createTask, deleteEvent, deleteList, deleteTask, emptyState, normalize, updateEvent, updateList, updateTask }

@@ -47,6 +47,23 @@ window.__ModuleLoader__.load({
       ceMore: '+{n}',
       ceFromTask: 'To calendar',
       ceLinked: 'In calendar',
+      connections: 'Connections',
+      connTitle: 'Calendars',
+      connAdd: 'Connect',
+      connProvider: 'Provider',
+      connUser: 'Login / email',
+      connPassword: 'App password',
+      connBase: 'CalDAV URL',
+      connSync: 'Sync',
+      connRemove: 'Remove',
+      connEmpty: 'No accounts yet. Connect Yandex or Mail.ru below.',
+      connLastSync: 'last sync',
+      connNever: 'never',
+      connBusy: 'Working…',
+      connImported: 'Imported from a provider — read-only here',
+      providerYandex: 'Yandex',
+      providerMailru: 'Mail.ru',
+      providerCaldav: 'Other CalDAV',
       fAll: 'All',
       fToday: 'Today',
       fUpcoming: 'Upcoming',
@@ -120,6 +137,23 @@ window.__ModuleLoader__.load({
       ceMore: '+{n}',
       ceFromTask: 'В календарь',
       ceLinked: 'В календаре',
+      connections: 'Подключения',
+      connTitle: 'Календари',
+      connAdd: 'Подключить',
+      connProvider: 'Провайдер',
+      connUser: 'Логин / email',
+      connPassword: 'Пароль приложения',
+      connBase: 'Адрес CalDAV',
+      connSync: 'Синхронизировать',
+      connRemove: 'Удалить',
+      connEmpty: 'Пока нет аккаунтов. Подключите Яндекс или Mail.ru ниже.',
+      connLastSync: 'синхронизация',
+      connNever: 'никогда',
+      connBusy: 'Работаю…',
+      connImported: 'Импортировано из провайдера — здесь только чтение',
+      providerYandex: 'Яндекс',
+      providerMailru: 'Mail.ru',
+      providerCaldav: 'Другой CalDAV',
       fAll: 'Все',
       fToday: 'Сегодня',
       fUpcoming: 'Скоро',
@@ -856,7 +890,7 @@ window.__ModuleLoader__.load({
     }
 
     function CalendarPanel(props) {
-      const { events, tasks, t, calView, onCalView, anchor, onAnchor, onOpenEvent, onNewEvent, onOpenTask } = props
+      const { events, tasks, t, calView, onCalView, anchor, onAnchor, onOpenEvent, onNewEvent, onOpenTask, onConnections } = props
       const today = new Date()
       const weekStartRef = useRef(null)
 
@@ -940,6 +974,11 @@ window.__ModuleLoader__.load({
             onClick: () => onCalView(id),
           }, t(label))),
         ),
+        h('button', {
+          type: 'button',
+          style: { ...S.linkBtn, marginLeft: 8 },
+          onClick: onConnections,
+        }, t('connections')),
         h('button', {
           type: 'button',
           style: { ...S.primaryBtn, marginLeft: 'auto' },
@@ -1156,6 +1195,7 @@ window.__ModuleLoader__.load({
 
     function EventDrawer(props) {
       const { event, tasks, t, onClose, onSave, onDelete, onOpenTask } = props
+      const readOnly = Boolean(event.source)
       const [title, setTitle] = useState(event.title)
       const [date, setDate] = useState(dayKey(new Date(event.startAt)))
       const [start, setStart] = useState(hhmm(event.startAt))
@@ -1198,11 +1238,22 @@ window.__ModuleLoader__.load({
           h('span', { style: S.drawerTitle }, t('ceTitle')),
           h('button', { type: 'button', style: S.closeBtn, onClick: onClose, 'aria-label': t('close') }, '×'),
         ),
+        readOnly
+          ? h('div', {
+            style: {
+              ...S.metaText,
+              marginBottom: 10,
+              padding: '6px 8px',
+              borderRadius: 8,
+              background: 'color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent)',
+            },
+          }, `${event.source.calendarTitle || 'CalDAV'} · ${t('connImported')}`)
+          : null,
         h(
           'div',
           { style: S.field },
           h('label', { style: S.label }, t('title')),
-          h('input', { style: S.fieldInput, value: title, onChange: e => setTitle(e.target.value) }),
+          h('input', { style: S.fieldInput, value: title, disabled: readOnly, onChange: e => setTitle(e.target.value) }),
         ),
         h(
           'div',
@@ -1263,17 +1314,91 @@ window.__ModuleLoader__.load({
           h('label', { style: S.label }, t('notes')),
           h('textarea', { style: { ...S.fieldInput, ...S.textarea }, value: notes, onChange: e => setNotes(e.target.value) }),
         ),
+        readOnly
+          ? null
+          : h(
+            'div',
+            { style: { ...S.row2, marginBottom: 12 } },
+            h('button', { type: 'button', style: S.primaryBtn, onClick: save }, t('ceSave')),
+            h('button', {
+              type: 'button',
+              style: S.dangerBtn,
+              onClick: () => {
+                if (window.confirm(t('ceDelete') + '?')) onDelete(event.id)
+              },
+            }, t('ceDelete')),
+          ),
+      )
+    }
+
+
+    function ConnectionsDrawer(props) {
+      const { accounts, form, setForm, error, busy, t, onClose, onConnect, onSync, onRemove } = props
+      const providerLabel = id => t(id === 'yandex' ? 'providerYandex' : id === 'mailru' ? 'providerMailru' : 'providerCaldav')
+      return h(
+        'aside',
+        { style: S.drawer, 'aria-label': t('connTitle') },
         h(
           'div',
-          { style: { ...S.row2, marginBottom: 12 } },
-          h('button', { type: 'button', style: S.primaryBtn, onClick: save }, t('ceSave')),
-          h('button', {
-            type: 'button',
-            style: S.dangerBtn,
-            onClick: () => {
-              if (window.confirm(t('ceDelete') + '?')) onDelete(event.id)
+          { style: S.drawerHead },
+          h('span', { style: S.drawerTitle }, t('connTitle')),
+          h('button', { type: 'button', style: S.closeBtn, onClick: onClose, 'aria-label': t('close') }, '×'),
+        ),
+        accounts.length === 0
+          ? h('div', { style: { ...S.metaText, marginBottom: 12 } }, t('connEmpty'))
+          : accounts.map(account => h(
+            'div',
+            {
+              key: account.id,
+              style: {
+                border: '1px solid var(--dsw-alias-border-l1)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                marginBottom: 10,
+              },
             },
-          }, t('ceDelete')),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+              h('span', { style: { fontWeight: 600, fontSize: 12.5 } }, providerLabel(account.provider)),
+              h('span', { style: { ...S.metaText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, account.username)),
+            h('div', { style: { ...S.metaText, margin: '4px 0 8px' } },
+              `${account.calendars.length} календарь(ей) · ${t('connLastSync')}: `
+              + (account.lastSyncAt ? new Date(account.lastSyncAt).toLocaleString() : t('connNever'))),
+            h('div', { style: { display: 'flex', gap: 6 } },
+              h('button', { type: 'button', style: S.subtleBtn, onClick: () => onSync(account.id) }, t('connSync')),
+              h('button', { type: 'button', style: S.dangerBtn, onClick: () => onRemove(account.id) }, t('connRemove'))),
+          )),
+        h('div', { style: { borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: 12, marginTop: 4 } },
+          h('div', { style: S.field },
+            h('label', { style: S.label }, t('connProvider')),
+            h('select', {
+              style: S.fieldInput,
+              value: form.provider,
+              onChange: e => setForm({ ...form, provider: e.target.value }),
+            }, [['yandex', 'providerYandex'], ['mailru', 'providerMailru'], ['caldav', 'providerCaldav']]
+              .map(([id, label]) => h('option', { key: id, value: id }, t(label))))),
+          h('div', { style: S.field },
+            h('label', { style: S.label }, t('connUser')),
+            h('input', { style: S.fieldInput, value: form.username, onChange: e => setForm({ ...form, username: e.target.value }) })),
+          h('div', { style: S.field },
+            h('label', { style: S.label }, t('connPassword')),
+            h('input', {
+              type: 'password',
+              style: S.fieldInput,
+              value: form.password,
+              onChange: e => setForm({ ...form, password: e.target.value }),
+            })),
+          form.provider === 'yandex'
+            ? null
+            : h('div', { style: S.field },
+              h('label', { style: S.label }, t('connBase')),
+              h('input', {
+                style: S.fieldInput,
+                value: form.baseUrl,
+                placeholder: 'https://calendar.mail.ru/…',
+                onChange: e => setForm({ ...form, baseUrl: e.target.value }),
+              })),
+          error ? h('div', { style: { ...S.metaText, color: 'var(--dsw-alias-state-error-primary)', marginBottom: 8 } }, error) : null,
+          h('button', { type: 'button', style: S.primaryBtn, onClick: onConnect, disabled: busy }, busy ? t('connBusy') : t('connAdd')),
         ),
       )
     }
@@ -1291,6 +1416,11 @@ window.__ModuleLoader__.load({
       const [calView, setCalView] = useState('month')
       const [anchor, setAnchor] = useState(new Date())
       const [selectedEventId, setSelectedEventId] = useState(null)
+      const [accounts, setAccounts] = useState([])
+      const [accountsOpen, setAccountsOpen] = useState(false)
+      const [accountForm, setAccountForm] = useState({ provider: 'yandex', username: '', password: '', baseUrl: '' })
+      const [accountError, setAccountError] = useState(null)
+      const [accountBusy, setAccountBusy] = useState(false)
       const [addingList, setAddingList] = useState(false)
       const [listName, setListName] = useState('')
       const inputRef = useRef(null)
@@ -1481,6 +1611,67 @@ window.__ModuleLoader__.load({
         setSelectedId(id)
       }
 
+      const loadAccounts = async () => {
+        try {
+          const payload = await api('/accounts')
+          setAccounts(payload.accounts ?? [])
+          setAccountError(null)
+        } catch (cause) {
+          setAccountError(cause.message)
+        }
+      }
+
+      const openAccounts = () => {
+        setAccountsOpen(true)
+        setSelectedId(null)
+        setSelectedEventId(null)
+        loadAccounts()
+      }
+
+      const connectAccount = async () => {
+        setAccountBusy(true)
+        setAccountError(null)
+        try {
+          const payload = await api('/accounts', { method: 'POST', body: JSON.stringify(accountForm) })
+          setAccounts(payload.accounts ?? [])
+          if (payload.state) setData(payload.state)
+          setAccountForm({ ...accountForm, password: '' })
+        } catch (cause) {
+          setAccountError(cause.message)
+        } finally {
+          setAccountBusy(false)
+        }
+      }
+
+      const syncNow = async id => {
+        setAccountBusy(true)
+        setAccountError(null)
+        try {
+          const payload = await api(`/accounts/${id}/sync`, { method: 'POST' })
+          if (payload.state) setData(payload.state)
+          await loadAccounts()
+        } catch (cause) {
+          setAccountError(cause.message)
+        } finally {
+          setAccountBusy(false)
+        }
+      }
+
+      const removeAccountById = async id => {
+        if (!window.confirm(t('connRemove') + '?')) return
+        setAccountBusy(true)
+        setAccountError(null)
+        try {
+          const payload = await api(`/accounts/${id}`, { method: 'DELETE' })
+          if (payload.state) setData(payload.state)
+          await loadAccounts()
+        } catch (cause) {
+          setAccountError(cause.message)
+        } finally {
+          setAccountBusy(false)
+        }
+      }
+
       const progressOf = id => {
         const children = childrenOf.get(id) ?? []
         return { done: children.filter(child => child.status === 'done').length, total: children.length }
@@ -1601,6 +1792,7 @@ window.__ModuleLoader__.load({
                 },
                 onNewEvent: createEventAt,
                 onOpenTask: openTaskFromCalendar,
+                onConnections: openAccounts,
               })
               : null,
             isCalendar
@@ -1676,7 +1868,20 @@ window.__ModuleLoader__.load({
                   )),
             ),
           ),
-          selectedEvent
+          accountsOpen
+            ? h(ConnectionsDrawer, {
+              accounts,
+              form: accountForm,
+              setForm: setAccountForm,
+              error: accountError,
+              busy: accountBusy,
+              t,
+              onClose: () => setAccountsOpen(false),
+              onConnect: connectAccount,
+              onSync: syncNow,
+              onRemove: removeAccountById,
+            })
+            : selectedEvent
             ? h(EventDrawer, {
               event: selectedEvent,
               tasks,
