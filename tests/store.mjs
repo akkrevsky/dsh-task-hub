@@ -9,11 +9,14 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import {
   TaskStore,
+  createEvent,
   createHandler,
   createList,
   createTask,
+  deleteEvent,
   deleteList,
   deleteTask,
+  updateEvent,
   updateList,
   updateTask,
 } from '../index.js'
@@ -111,6 +114,47 @@ try {
   assert.equal(trimmed.state.lists.length, 1)
   await assert.rejects(() => store.mutate(draft => deleteList(draft, draft.lists[0].id)), /last list/)
 
+  // --- events --------------------------------------------------------------
+  const eventCreated = await store.mutate(draft => createEvent(draft, {
+    title: 'Standup',
+    startAt: '2026-11-17T09:00:00+05:00',
+    endAt: '2026-11-17T09:30:00+05:00',
+  }))
+  assert.equal(eventCreated.result.title, 'Standup')
+  assert.equal(eventCreated.state.events.length, 1)
+
+  const defaultEnd = await store.mutate(draft => createEvent(draft, { title: 'Call', startAt: '2026-11-17T12:00:00+05:00' }))
+  assert.equal(Date.parse(defaultEnd.result.endAt) - Date.parse(defaultEnd.result.startAt), 3600000,
+    'a missing end defaults to one hour')
+
+  await assert.rejects(() => store.mutate(draft => createEvent(draft, { title: 'X', startAt: 'nope' })), /ISO date-time/)
+  await assert.rejects(
+    () => store.mutate(draft => createEvent(draft, { title: 'X', startAt: '2026-11-17T12:00:00Z', endAt: '2026-11-17T11:00:00Z' })),
+    /before startAt/,
+  )
+  await assert.rejects(() => store.mutate(draft => createEvent(draft, { title: '', startAt: '2026-11-17T12:00:00Z' })), /title is required/)
+  await assert.rejects(() => store.mutate(draft => updateEvent(draft, 'missing', { title: 'x' })), /unknown event/)
+
+  const linkTarget = (await store.read()).tasks[0].id
+  const linked = await store.mutate(draft => updateEvent(draft, eventCreated.result.id, { taskId: linkTarget }))
+  assert.equal(linked.result.taskId, linkTarget, 'an event links to a task')
+
+  const moved = await store.mutate(draft => updateEvent(draft, eventCreated.result.id, { startAt: '2026-11-18T10:00:00+05:00' }))
+  assert.equal(Date.parse(moved.result.endAt) - Date.parse(moved.result.startAt), 30 * 60000,
+    'moving an event keeps its duration')
+
+  const unlinked = await store.mutate(draft => updateEvent(draft, eventCreated.result.id, { taskId: '' }))
+  assert.equal(unlinked.result.taskId, null, 'an empty taskId detaches the event')
+
+  await store.mutate(draft => updateEvent(draft, eventCreated.result.id, { taskId: linkTarget }))
+  await store.mutate(draft => deleteTask(draft, linkTarget))
+  assert.equal((await store.read()).events.find(event => event.id === eventCreated.result.id).taskId, null,
+    'deleting a task detaches its events')
+
+  const removedEvent = await store.mutate(draft => deleteEvent(draft, defaultEnd.result.id))
+  assert.equal(removedEvent.state.events.length, 1)
+  assert.equal(removedEvent.result.deleted, defaultEnd.result.id)
+
   // --- routes --------------------------------------------------------------
   const handler = createHandler(store)
   const state = await call(handler, 'GET', '/dsh-task-hub/api/state')
@@ -138,7 +182,26 @@ try {
   assert.equal(del.status, 200)
   assert.equal(del.body.state.tasks.length, before, 'DELETE removes exactly the created task')
 
-  console.log('ok: store, persistence, cascade, validation and routes')
+  const eventPost = await call(handler, 'POST', '/dsh-task-hub/api/events', {
+    title: 'From HTTP',
+    startAt: '2026-11-20T10:00:00+05:00',
+  })
+  assert.equal(eventPost.status, 200)
+  assert.equal(eventPost.body.event.title, 'From HTTP')
+  const eventId = eventPost.body.event.id
+
+  const eventPatch = await call(handler, 'PATCH', `/dsh-task-hub/api/events/${eventId}`, { title: 'Renamed' })
+  assert.equal(eventPatch.status, 200)
+  assert.equal(eventPatch.body.event.title, 'Renamed')
+
+  const badEvent = await call(handler, 'POST', '/dsh-task-hub/api/events', { title: 'Broken', startAt: 'no' })
+  assert.equal(badEvent.status, 400)
+
+  const eventDel = await call(handler, 'DELETE', `/dsh-task-hub/api/events/${eventId}`)
+  assert.equal(eventDel.status, 200)
+  assert.equal(eventDel.body.state.events.length, 1, 'only the created event is removed')
+
+  console.log('ok: store, persistence, cascade, events, validation and routes')
 } finally {
   await rm(dir, { recursive: true, force: true })
 }

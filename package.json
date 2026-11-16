@@ -1,6 +1,6 @@
 {
   "name": "dsh-task-hub",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Task tree, calendar and unified mail for DeepSeek Harness — a first-class workspace in the left sidebar.",
   "type": "module",
   "license": "MIT",
@@ -51,6 +51,12 @@
     }
   },
   "scripts": {
-    "test": "node tests/store.mjs && node tests/smoke.mjs"
+    "test": "node tests/store.mjs && node tests/smoke.mjs",
+    "test:ui": "node tests/ui.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }

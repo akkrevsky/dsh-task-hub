@@ -3,10 +3,10 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M1 — local tasks.** Lists, a task tree, subtasks, due dates, tags
-> and an editor work on a local JSON store, and three agent tools share it.
-> Calendars, providers and mail are not implemented yet; the roadmap below is
-> the plan, not a description of current behaviour.
+> **Status: M2 — local tasks and calendar.** Lists, a task tree, subtasks, due
+> dates, tags, an editor and a calendar (month / week / agenda) work on a local
+> JSON store; four agent tools share it. Provider sync (Google/Yandex/Mail.ru)
+> and mail are not implemented yet; the roadmap below is the plan.
 
 ## What works today
 
@@ -18,16 +18,22 @@ DeepSeek Harness left sidebar.
   parent progress).
 - Editor: title, due date, priority, list, tags, notes, subtasks, delete.
   Finishing a parent finishes its open children.
+- Calendar: month grid, week grid with positioned events, agenda; create an
+  event by clicking a day or an hour; an event editor with date, time, all-day,
+  notes and a linked task.
+- Task ↔ event link: "To calendar" in the task editor; deleting a task detaches
+  its events; deleting an event keeps the task.
 - Storage: `$DSH_HOME/plugin-data/dsh-task-hub/tasks.json` (or
   `DSH_TASK_HUB_STORE`), written through a temporary file and `rename()`.
 - HTTP API under `/dsh-task-hub/api` and agent tools `tasks_list`,
-  `tasks_create`, `tasks_update`.
+  `tasks_create`, `tasks_update`, `calendar_agenda`.
 - Client strings for `en` and `ru`; the UI follows the host theme through
   `--dsw-alias-*` tokens.
 
 ## Limitations
 
-- No calendar view yet (M2), no provider sync (M3–M4), no mail (M5).
+- No provider sync (M3–M4) and no mail (M5): the calendar holds local events only.
+- The week view shows a 24-hour grid without drag-and-drop resizing.
 - Single user, single profile: no sharing, no conflict resolution.
 - The store is a plain JSON file; it is not a database and has no history.
 
@@ -37,7 +43,7 @@ DeepSeek Harness left sidebar.
 |---|---|
 | M0 ✅ | Bundle, rail entry, panel, locale, packaging |
 | M1 ✅ | Local lists, tree, subtasks, due dates, tags, JSON store, agent tools |
-| M2 | Calendar views (month / week / agenda) on local data, task ↔ event link |
+| M2 ✅ | Calendar views (month / week / agenda) on local data, task ↔ event link |
 | M3 | CalDAV sync: Yandex (`caldav.yandex.ru`) and Mail.ru, two-way, conflict list |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
 | M5 | Mail over IMAP for Gmail / Yandex / Mail.ru, "turn a message into a task" |

@@ -42,6 +42,7 @@ function emptyState() {
     version: STORE_VERSION,
     lists: DEFAULT_LISTS.map(list => ({ ...list })),
     tasks: [],
+    events: [],
     updatedAt: now,
   }
 }
@@ -79,6 +80,25 @@ function normalize(raw) {
     // Drop parent references that point at a missing task.
     const ids = new Set(state.tasks.map(task => task.id))
     for (const task of state.tasks) if (task.parentId !== null && !ids.has(task.parentId)) task.parentId = null
+  }
+  if (Array.isArray(raw.events)) {
+    const taskIds = new Set(state.tasks.map(task => task.id))
+    state.events = raw.events.filter(isPlainObject).slice(0, MAX_TASKS).map(event => {
+      const startAt = isIsoDate(event.startAt) ? event.startAt : new Date().toISOString()
+      const endAt = isIsoDate(event.endAt) ? event.endAt : startAt
+      return {
+        id: String(event.id ?? randomUUID()),
+        title: clampText(event.title, MAX_TITLE) || 'Событие',
+        notes: clampText(event.notes, MAX_NOTES),
+        startAt,
+        endAt: Date.parse(endAt) >= Date.parse(startAt) ? endAt : new Date(Date.parse(startAt) + 3600000).toISOString(),
+        allDay: event.allDay === true,
+        color: typeof event.color === 'string' ? event.color : '#4D6BFE',
+        taskId: typeof event.taskId === 'string' && taskIds.has(event.taskId) ? event.taskId : null,
+        createdAt: isIsoDate(event.createdAt) ? event.createdAt : new Date().toISOString(),
+        updatedAt: isIsoDate(event.updatedAt) ? event.updatedAt : new Date().toISOString(),
+      }
+    })
   }
   state.updatedAt = isIsoDate(raw.updatedAt) ? raw.updatedAt : new Date().toISOString()
   return state
@@ -240,7 +260,79 @@ function deleteTask(state, id) {
     }
   }
   state.tasks = state.tasks.filter(task => !doomed.has(task.id))
+  for (const event of state.events) if (event.taskId !== null && doomed.has(event.taskId)) event.taskId = null
   return { deleted: [...doomed] }
+}
+
+function findEvent(state, id) {
+  const event = state.events.find(item => item.id === id)
+  if (!event) throw new Error(`unknown event: ${id}`)
+  return event
+}
+
+function createEvent(state, input) {
+  const title = clampText(input.title, MAX_TITLE)
+  if (!title) throw new Error('event title is required')
+  if (!isIsoDate(input.startAt)) throw new Error('startAt must be an ISO date-time')
+  const startMs = Date.parse(input.startAt)
+  const endMs = isIsoDate(input.endAt) ? Date.parse(input.endAt) : startMs + 3600000
+  if (endMs < startMs) throw new Error('endAt must not be before startAt')
+  if (state.events.length >= MAX_TASKS) throw new Error(`event limit reached (${MAX_TASKS})`)
+  const taskId = typeof input.taskId === 'string' && state.tasks.some(task => task.id === input.taskId)
+    ? input.taskId
+    : null
+  const now = new Date().toISOString()
+  const event = {
+    id: randomUUID(),
+    title,
+    notes: clampText(input.notes, MAX_NOTES),
+    startAt: new Date(startMs).toISOString(),
+    endAt: new Date(Math.max(endMs, startMs + 60000)).toISOString(),
+    allDay: input.allDay === true,
+    color: typeof input.color === 'string' ? input.color : '#4D6BFE',
+    taskId,
+    createdAt: now,
+    updatedAt: now,
+  }
+  state.events.push(event)
+  return event
+}
+
+function updateEvent(state, id, patch) {
+  const event = findEvent(state, id)
+  if (patch.title !== undefined) {
+    const title = clampText(patch.title, MAX_TITLE)
+    if (!title) throw new Error('event title cannot be empty')
+    event.title = title
+  }
+  if (patch.notes !== undefined) event.notes = clampText(patch.notes, MAX_NOTES)
+  if (patch.startAt !== undefined) {
+    if (!isIsoDate(patch.startAt)) throw new Error('startAt must be an ISO date-time')
+    const previousStart = Date.parse(event.startAt)
+    const previousDuration = Date.parse(event.endAt) - previousStart
+    const startMs = Date.parse(patch.startAt)
+    event.startAt = new Date(startMs).toISOString()
+    event.endAt = new Date(startMs + Math.max(previousDuration, 60000)).toISOString()
+  }
+  if (patch.endAt !== undefined && patch.startAt === undefined) {
+    if (!isIsoDate(patch.endAt)) throw new Error('endAt must be an ISO date-time')
+    if (Date.parse(patch.endAt) < Date.parse(event.startAt)) throw new Error('endAt must not be before startAt')
+    event.endAt = patch.endAt
+  }
+  if (patch.allDay !== undefined) event.allDay = patch.allDay === true
+  if (typeof patch.color === 'string') event.color = patch.color
+  if (patch.taskId !== undefined) {
+    event.taskId = typeof patch.taskId === 'string' && patch.taskId !== ''
+      && state.tasks.some(task => task.id === patch.taskId) ? patch.taskId : null
+  }
+  event.updatedAt = new Date().toISOString()
+  return event
+}
+
+function deleteEvent(state, id) {
+  findEvent(state, id)
+  state.events = state.events.filter(event => event.id !== id)
+  return { deleted: id }
 }
 
 function createList(state, input) {
@@ -340,6 +432,23 @@ function createHandler(store) {
       if (method === 'DELETE' && /^\/tasks\/[^/]+$/.test(path)) {
         const id = decodeURIComponent(path.slice('/tasks/'.length))
         const { state } = await store.mutate(draft => deleteTask(draft, id))
+        return send(res, 200, { state })
+      }
+
+      if (method === 'POST' && path === '/events') {
+        const body = await readJson(req)
+        const { result, state } = await store.mutate(draft => createEvent(draft, body))
+        return send(res, 200, { state, event: result })
+      }
+      if (method === 'PATCH' && /^\/events\/[^/]+$/.test(path)) {
+        const id = decodeURIComponent(path.slice('/events/'.length))
+        const body = await readJson(req)
+        const { result, state } = await store.mutate(draft => updateEvent(draft, id, body))
+        return send(res, 200, { state, event: result })
+      }
+      if (method === 'DELETE' && /^\/events\/[^/]+$/.test(path)) {
+        const id = decodeURIComponent(path.slice('/events/'.length))
+        const { state } = await store.mutate(draft => deleteEvent(draft, id))
         return send(res, 200, { state })
       }
 
@@ -505,7 +614,46 @@ function registerTools(ctx, store) {
     },
   }
 
-  for (const definition of [listTool, createTool, updateTool]) ctx.tools.register(definition)
+  const agendaTool = {
+    name: 'calendar_agenda',
+    description: 'Read the Task Hub calendar for a date range: local events plus tasks whose due date '
+      + 'falls inside the range. Defaults to the next 7 days. The calendar has no external provider sync yet.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        from: { type: 'string', description: 'ISO 8601 range start; defaults to now.' },
+        to: { type: 'string', description: 'ISO 8601 range end; defaults to from + 7 days.' },
+        limit: { type: 'integer', description: 'Maximum rows (default 50, max 200).' },
+      },
+    },
+    output: { schema: OUTPUT_SCHEMA, render: textRender },
+    execute: async (args, exec) => {
+      exec?.signal?.throwIfAborted?.()
+      const state = await store.read()
+      const fromMs = isIsoDate(args?.from) ? Date.parse(args.from) : Date.now()
+      const toMs = isIsoDate(args?.to) ? Date.parse(args.to) : fromMs + 7 * 86400000
+      if (toMs <= fromMs) throw new Error('to must be after from')
+      const limit = Math.min(Math.max(Number(args?.limit) || 50, 1), 200)
+      const events = state.events
+        .filter(event => Date.parse(event.endAt) >= fromMs && Date.parse(event.startAt) <= toMs)
+        .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
+        .slice(0, limit)
+      const tasks = state.tasks
+        .filter(task => task.status === 'open' && task.dueAt
+          && Date.parse(task.dueAt) >= fromMs && Date.parse(task.dueAt) <= toMs)
+        .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt))
+        .slice(0, limit)
+      if (events.length === 0 && tasks.length === 0) return { ok: true, message: 'В этом диапазоне пусто.' }
+      const lines = [
+        ...events.map(event => `• ${event.allDay ? 'весь день' : event.startAt.slice(0, 16).replace('T', ' ')} — ${event.title}`),
+        ...tasks.map(task => `• ${task.dueAt.slice(0, 16).replace('T', ' ')} — задача «${task.title}»`),
+      ]
+      return { ok: true, message: `Календарь (${events.length} событий, ${tasks.length} задач):\n${lines.join('\n')}` }
+    },
+  }
+
+  for (const definition of [listTool, createTool, updateTool, agendaTool]) ctx.tools.register(definition)
 }
 
 /* ------------------------------------------------------------------- apply */
@@ -522,4 +670,4 @@ export function apply(ctx) {
   registerTools(ctx, store)
 }
 
-export { TaskStore, createHandler, createList, createTask, deleteList, deleteTask, emptyState, normalize, updateList, updateTask }
+export { TaskStore, createEvent, createHandler, createList, createTask, deleteEvent, deleteList, deleteTask, emptyState, normalize, updateEvent, updateList, updateTask }

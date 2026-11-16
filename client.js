@@ -27,6 +27,26 @@ window.__ModuleLoader__.load({
       tabTree: 'Tree',
       tabCalendar: 'Calendar',
       tabSoon: 'Arrives in M2',
+      calMonth: 'Month',
+      calWeek: 'Week',
+      calAgenda: 'Agenda',
+      calToday: 'Today',
+      calNew: 'New event',
+      calEmpty: 'No events in this range',
+      ceTitle: 'Event',
+      ceAllDay: 'All day',
+      ceStart: 'Start',
+      ceEnd: 'End',
+      ceDate: 'Date',
+      ceTask: 'Linked task',
+      ceNoTask: 'Not linked',
+      ceOpenTask: 'Open task',
+      ceCreateTask: 'Create a task',
+      ceDelete: 'Delete event',
+      ceSave: 'Save',
+      ceMore: '+{n}',
+      ceFromTask: 'To calendar',
+      ceLinked: 'In calendar',
       fAll: 'All',
       fToday: 'Today',
       fUpcoming: 'Upcoming',
@@ -80,6 +100,26 @@ window.__ModuleLoader__.load({
       tabTree: 'Дерево',
       tabCalendar: 'Календарь',
       tabSoon: 'Появится в M2',
+      calMonth: 'Месяц',
+      calWeek: 'Неделя',
+      calAgenda: 'Повестка',
+      calToday: 'Сегодня',
+      calNew: 'Новое событие',
+      calEmpty: 'В этом диапазоне событий нет',
+      ceTitle: 'Событие',
+      ceAllDay: 'Весь день',
+      ceStart: 'Начало',
+      ceEnd: 'Конец',
+      ceDate: 'Дата',
+      ceTask: 'Связанная задача',
+      ceNoTask: 'Без связи',
+      ceOpenTask: 'Открыть задачу',
+      ceCreateTask: 'Создать задачу',
+      ceDelete: 'Удалить событие',
+      ceSave: 'Сохранить',
+      ceMore: '+{n}',
+      ceFromTask: 'В календарь',
+      ceLinked: 'В календаре',
       fAll: 'Все',
       fToday: 'Сегодня',
       fUpcoming: 'Скоро',
@@ -165,6 +205,47 @@ window.__ModuleLoader__.load({
       return `${date}, ${time}`
     }
 
+    function addDays(date, count) {
+      const next = new Date(date)
+      next.setDate(next.getDate() + count)
+      return next
+    }
+
+    function startOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    }
+
+    function startOfWeek(date) {
+      const base = startOfDay(date)
+      const shift = (base.getDay() + 6) % 7
+      return addDays(base, -shift)
+    }
+
+    function startOfMonth(date) {
+      return new Date(date.getFullYear(), date.getMonth(), 1)
+    }
+
+    function dayKey(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    }
+
+    function hhmm(iso) {
+      const date = new Date(iso)
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+    }
+
+    function humanMonth(date) {
+      return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date)
+    }
+
+    function humanDayLong(date) {
+      return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(date)
+    }
+
+    function eventColor(event) {
+      return typeof event.color === 'string' && event.color ? event.color : 'var(--dsw-alias-brand-primary)'
+    }
+
     function taskOrder(a, b) {
       const aDue = a.dueAt ? Date.parse(a.dueAt) : Number.MAX_SAFE_INTEGER
       const bDue = b.dueAt ? Date.parse(b.dueAt) : Number.MAX_SAFE_INTEGER
@@ -226,7 +307,7 @@ window.__ModuleLoader__.load({
         border: 0,
         background: 'transparent',
         color: 'var(--dsw-alias-label-secondary)',
-        font: '500 12px/1 inherit',
+        fontSize: 12, fontWeight: 500, lineHeight: 1, fontFamily: 'inherit',
         padding: '7px 11px',
         borderRadius: 7,
         cursor: 'pointer',
@@ -238,7 +319,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)',
         background: 'var(--dsw-alias-bg-layer-1)',
         color: 'var(--dsw-alias-label-primary)',
-        font: '500 11.5px/1 inherit',
+        fontSize: 11.5, fontWeight: 500, lineHeight: 1, fontFamily: 'inherit',
         padding: '7px 10px',
         borderRadius: 8,
         cursor: 'pointer',
@@ -268,7 +349,7 @@ window.__ModuleLoader__.load({
         border: 0,
         background: 'transparent',
         color: 'var(--dsw-alias-label-primary)',
-        font: '500 12.5px/1 inherit',
+        fontSize: 12.5, fontWeight: 500, lineHeight: 1, fontFamily: 'inherit',
         padding: '8px 8px',
         borderRadius: 8,
         cursor: 'pointer',
@@ -283,7 +364,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)',
         background: 'var(--dsw-alias-bg-base)',
         color: 'var(--dsw-alias-label-primary)',
-        font: '400 12.5px/1.3 inherit',
+        fontSize: 12.5, fontWeight: 400, lineHeight: 1.3, fontFamily: 'inherit',
         padding: '8px 10px',
         borderRadius: 8,
         outline: 'none',
@@ -296,7 +377,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)',
         background: 'var(--dsw-alias-bg-layer-1)',
         color: 'var(--dsw-alias-label-primary)',
-        font: '400 13px/1.4 inherit',
+        fontSize: 13, fontWeight: 400, lineHeight: 1.4, fontFamily: 'inherit',
         padding: '10px 12px',
         borderRadius: 10,
         outline: 'none',
@@ -305,7 +386,7 @@ window.__ModuleLoader__.load({
         border: 0,
         background: 'var(--dsw-alias-brand-primary)',
         color: '#fff',
-        font: '600 12px/1 inherit',
+        fontSize: 12, fontWeight: 600, lineHeight: 1, fontFamily: 'inherit',
         padding: '10px 14px',
         borderRadius: 9,
         cursor: 'pointer',
@@ -415,7 +496,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)',
         background: 'var(--dsw-alias-bg-base)',
         color: 'var(--dsw-alias-label-primary)',
-        font: '400 12.5px/1.4 inherit',
+        fontSize: 12.5, fontWeight: 400, lineHeight: 1.4, fontFamily: 'inherit',
         padding: '8px 10px',
         borderRadius: 8,
         outline: 'none',
@@ -426,7 +507,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)',
         background: 'transparent',
         color: 'var(--dsw-alias-label-primary)',
-        font: '500 12px/1 inherit',
+        fontSize: 12, fontWeight: 500, lineHeight: 1, fontFamily: 'inherit',
         padding: '8px 12px',
         borderRadius: 8,
         cursor: 'pointer',
@@ -435,7 +516,7 @@ window.__ModuleLoader__.load({
         border: '1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent)',
         background: 'transparent',
         color: 'var(--dsw-alias-state-error-primary)',
-        font: '500 12px/1 inherit',
+        fontSize: 12, fontWeight: 500, lineHeight: 1, fontFamily: 'inherit',
         padding: '8px 12px',
         borderRadius: 8,
         cursor: 'pointer',
@@ -550,7 +631,7 @@ window.__ModuleLoader__.load({
     }
 
     function Drawer(props) {
-      const { task, lists, tasks, t, onClose, onSave, onDelete, onCreateSubtask, onToggleTask } = props
+      const { task, lists, tasks, t, onClose, onSave, onDelete, onCreateSubtask, onToggleTask, linkedEvent, onToCalendar } = props
       const [title, setTitle] = useState(task.title)
       const [notes, setNotes] = useState(task.notes || '')
       const [due, setDue] = useState(toLocalInput(task.dueAt))
@@ -634,6 +715,14 @@ window.__ModuleLoader__.load({
           h('label', { style: S.label }, `${t('tags')} · ${t('tagsHint')}`),
           h('input', { style: S.fieldInput, value: tags, onChange: mark(setTags) }),
         ),
+        linkedEvent
+          ? h('div', { style: { ...S.metaText, marginBottom: 8 } }, `${t('ceLinked')}: ${hhmm(linkedEvent.startAt)} · ${linkedEvent.title}`)
+          : null,
+        h('button', {
+          type: 'button',
+          style: { ...S.subtleBtn, marginBottom: 12 },
+          onClick: () => onToCalendar(task),
+        }, t('ceFromTask')),
         h(
           'div',
           { style: S.field },
@@ -696,6 +785,499 @@ window.__ModuleLoader__.load({
       )
     }
 
+
+    function EventChip(props) {
+      const { event, t, compact, onClick } = props
+      const color = eventColor(event)
+      return h(
+        'div',
+        {
+          title: `${hhmm(event.startAt)} ${event.title}`,
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: compact ? '1px 4px' : '3px 7px',
+            marginBottom: 2,
+            borderRadius: 5,
+            background: `color-mix(in srgb, ${color} 12%, transparent)`,
+            cursor: 'pointer',
+            overflow: 'hidden',
+            minWidth: 0,
+          },
+          onClick: e => {
+            e.stopPropagation()
+            onClick(event.id)
+          },
+        },
+        h('span', { style: { width: 2.5, alignSelf: 'stretch', minHeight: 12, background: color, borderRadius: 2, flex: '0 0 auto' } }),
+        event.allDay
+          ? null
+          : h('span', { style: { fontSize: compact ? 9 : 10, color: 'var(--dsw-alias-label-secondary)', flex: '0 0 auto' } }, hhmm(event.startAt)),
+        h('span', {
+          style: {
+            fontSize: compact ? 9.5 : 10.5,
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          },
+        }, event.title),
+      )
+    }
+
+    function TaskChip(props) {
+      const { task, onClick } = props
+      return h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '1px 4px',
+            marginBottom: 2,
+            fontSize: 9.5,
+            borderRadius: 4,
+            border: '1px dashed var(--dsw-alias-border-l2)',
+            color: 'var(--dsw-alias-label-secondary)',
+            cursor: 'pointer',
+            overflow: 'hidden',
+          },
+          title: task.title,
+          onClick: e => {
+            e.stopPropagation()
+            onClick(task.id)
+          },
+        },
+        h('span', { style: { width: 7, height: 7, borderRadius: 2, border: '1px solid var(--dsw-alias-border-l2)', flex: '0 0 auto' } }),
+        h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, task.title),
+      )
+    }
+
+    function CalendarPanel(props) {
+      const { events, tasks, t, calView, onCalView, anchor, onAnchor, onOpenEvent, onNewEvent, onOpenTask } = props
+      const today = new Date()
+      const weekStartRef = useRef(null)
+
+      const monthCells = useMemo(() => {
+        const gridStart = startOfWeek(startOfMonth(anchor))
+        return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
+      }, [anchor])
+
+      const weekDays = useMemo(() => {
+        const start = startOfWeek(anchor)
+        return Array.from({ length: 7 }, (_, index) => addDays(start, index))
+      }, [anchor])
+
+      const eventsByDay = useMemo(() => {
+        const map = new Map()
+        for (const event of events) {
+          let cursor = startOfDay(new Date(event.startAt))
+          const last = startOfDay(new Date(event.endAt))
+          let guard = 0
+          while (cursor <= last && guard < 14) {
+            const key = dayKey(cursor)
+            if (!map.has(key)) map.set(key, [])
+            map.get(key).push(event)
+            cursor = addDays(cursor, 1)
+            guard += 1
+          }
+        }
+        for (const list of map.values()) list.sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
+        return map
+      }, [events])
+
+      const tasksByDay = useMemo(() => {
+        const map = new Map()
+        for (const task of tasks) {
+          if (!task.dueAt) continue
+          const key = dayKey(new Date(task.dueAt))
+          if (!map.has(key)) map.set(key, [])
+          map.get(key).push(task)
+        }
+        return map
+      }, [tasks])
+
+      useEffect(() => {
+        if (calView === 'week' && weekStartRef.current) weekStartRef.current.scrollTop = 8 * 44
+      }, [calView])
+
+      const shift = direction => {
+        if (calView === 'month') onAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + direction, 1))
+        else onAnchor(addDays(anchor, direction * 7))
+      }
+
+      const toolbar = h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 20px',
+            borderBottom: '1px solid var(--dsw-alias-border-l1)',
+            flex: '0 0 auto',
+            flexWrap: 'wrap',
+          },
+        },
+        h('button', { type: 'button', style: S.linkBtn, onClick: () => shift(-1), 'aria-label': 'previous' }, '‹'),
+        h('span', { style: { fontSize: 13.5, fontWeight: 600, minWidth: 150 } },
+          calView === 'week'
+            ? `${humanDayLong(weekDays[0])} — ${humanDayLong(weekDays[6])}`
+            : calView === 'agenda'
+              ? `${humanDayLong(today)} +30`
+              : humanMonth(anchor)),
+        h('button', { type: 'button', style: S.linkBtn, onClick: () => shift(1), 'aria-label': 'next' }, '›'),
+        h('button', { type: 'button', style: S.linkBtn, onClick: () => onAnchor(new Date()) }, t('calToday')),
+        h(
+          'div',
+          { style: { ...S.tabs, marginLeft: 8 } },
+          [['month', 'calMonth'], ['week', 'calWeek'], ['agenda', 'calAgenda']].map(([id, label]) => h('button', {
+            key: id,
+            type: 'button',
+            style: calView === id ? { ...S.tab, ...S.tabActive } : S.tab,
+            onClick: () => onCalView(id),
+          }, t(label))),
+        ),
+        h('button', {
+          type: 'button',
+          style: { ...S.primaryBtn, marginLeft: 'auto' },
+          onClick: () => onNewEvent(anchor, 10),
+        }, `＋ ${t('calNew')}`),
+      )
+
+      if (calView === 'month') {
+        const headers = weekDays.map(day => new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day))
+        return h(
+          'div',
+          { style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 } },
+          toolbar,
+          h(
+            'div',
+            { style: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', flex: '0 0 auto', padding: '0 20px', marginTop: 6 } },
+            headers.map((label, index) => h('div', {
+              key: index,
+              style: {
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: index >= 5 ? 'var(--dsw-alias-label-secondary)' : 'var(--dsw-alias-label-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                padding: '4px 6px',
+              },
+            }, label)),
+          ),
+          h(
+            'div',
+            { style: { flex: 1, overflowY: 'auto', padding: '0 20px 20px' } },
+            h(
+              'div',
+              { style: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderTop: '1px solid var(--dsw-alias-border-l1)', borderLeft: '1px solid var(--dsw-alias-border-l1)' } },
+              monthCells.map(cell => {
+                const key = dayKey(cell)
+                const dayEvents = eventsByDay.get(key) ?? []
+                const dayTasks = tasksByDay.get(key) ?? []
+                const isToday = sameDay(cell, today)
+                const sameMonth = cell.getMonth() === anchor.getMonth()
+                const overflow = Math.max(0, dayEvents.length - 2) + Math.max(0, dayTasks.length - (dayEvents.length >= 2 ? 0 : 1))
+                return h(
+                  'div',
+                  {
+                    key,
+                    style: {
+                      minHeight: 104,
+                      padding: '6px 6px 4px',
+                      borderRight: '1px solid var(--dsw-alias-border-l1)',
+                      borderBottom: '1px solid var(--dsw-alias-border-l1)',
+                      background: isToday ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                    },
+                    onClick: () => onNewEvent(cell, 10),
+                  },
+                  h(
+                    'div',
+                    { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 } },
+                    h('span', {
+                      style: {
+                        fontSize: 11.5,
+                        fontWeight: isToday ? 600 : 500,
+                        color: isToday ? 'var(--dsw-alias-brand-primary)' : sameMonth ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+                      },
+                    }, String(cell.getDate())),
+                    isToday ? h('span', { style: { fontSize: 9, color: 'var(--dsw-alias-brand-primary)' } }, t('calToday')) : null,
+                  ),
+                  dayEvents.slice(0, 2).map(event => h(EventChip, {
+                    key: event.id,
+                    event,
+                    t,
+                    compact: true,
+                    onClick: onOpenEvent,
+                  })),
+                  dayEvents.length < 2
+                    ? dayTasks.slice(0, 1).map(task => h(TaskChip, { key: task.id, task, onClick: onOpenTask }))
+                    : null,
+                  overflow > 0
+                    ? h('div', { style: { fontSize: 9.5, color: 'var(--dsw-alias-label-secondary)', paddingLeft: 4 } }, `+${overflow}`)
+                    : null,
+                )
+              }),
+            ),
+          ),
+        )
+      }
+
+      if (calView === 'week') {
+        const hours = Array.from({ length: 24 }, (_, index) => index)
+        return h(
+          'div',
+          { style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 } },
+          toolbar,
+          h(
+            'div',
+            { style: { display: 'flex', padding: '0 20px', borderBottom: '1px solid var(--dsw-alias-border-l1)' } },
+            h('div', { style: { width: 52, flex: '0 0 auto' } }),
+            weekDays.map(day => h('div', {
+              key: dayKey(day),
+              style: {
+                flex: 1,
+                padding: '6px 6px',
+                textAlign: 'center',
+                fontSize: 11,
+                fontWeight: sameDay(day, today) ? 600 : 500,
+                color: sameDay(day, today) ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-primary)',
+              },
+            }, `${new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day)} ${day.getDate()}`)),
+          ),
+          h(
+            'div',
+            { ref: weekStartRef, style: { flex: 1, overflowY: 'auto', padding: '0 20px 20px' } },
+            h(
+              'div',
+              { style: { display: 'flex', position: 'relative' } },
+              h(
+                'div',
+                { style: { width: 52, flex: '0 0 auto' } },
+                hours.map(hour => h('div', {
+                  key: hour,
+                  style: { height: 44, fontSize: 9.5, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right', paddingRight: 6 },
+                }, hour === 0 ? '' : `${pad(hour)}:00`)),
+              ),
+              weekDays.map(day => {
+                const key = dayKey(day)
+                const dayEvents = (eventsByDay.get(key) ?? []).filter(event => !event.allDay)
+                return h(
+                  'div',
+                  {
+                    key,
+                    style: {
+                      flex: 1,
+                      position: 'relative',
+                      borderLeft: '1px solid var(--dsw-alias-border-l1)',
+                      background: sameDay(day, today) ? 'color-mix(in srgb, var(--dsw-alias-brand-primary) 3%, transparent)' : 'transparent',
+                      cursor: 'pointer',
+                    },
+                    onClick: clickEvent => {
+                      const rect = clickEvent.currentTarget.getBoundingClientRect()
+                      const hour = Math.min(23, Math.max(0, Math.floor((clickEvent.clientY - rect.top) / 44)))
+                      onNewEvent(day, hour)
+                    },
+                  },
+                  hours.map(hour => h('div', {
+                    key: hour,
+                    style: { height: 44, borderTop: hour === 0 ? 'none' : '1px solid var(--dsw-alias-border-l1)', opacity: 0.7 },
+                  })),
+                  dayEvents.map(event => {
+                    const start = new Date(event.startAt)
+                    const end = new Date(event.endAt)
+                    const top = (start.getHours() + start.getMinutes() / 60) * 44
+                    const height = Math.max(20, ((end - start) / 3600000) * 44)
+                    const color = eventColor(event)
+                    return h('div', {
+                      key: event.id,
+                      title: `${hhmm(event.startAt)}–${hhmm(event.endAt)} ${event.title}`,
+                      style: {
+                        position: 'absolute',
+                        left: 2,
+                        right: 2,
+                        top,
+                        height,
+                        borderRadius: 4,
+                        padding: '2px 4px',
+                        background: `color-mix(in srgb, ${color} 16%, transparent)`,
+                        borderLeft: `3px solid ${color}`,
+                        overflow: 'hidden',
+                        fontSize: 9.5,
+                        cursor: 'pointer',
+                      },
+                      onClick: e => {
+                        e.stopPropagation()
+                        onOpenEvent(event.id)
+                      },
+                    }, `${hhmm(event.startAt)} ${event.title}`)
+                  }),
+                )
+              }),
+            ),
+          ),
+        )
+      }
+
+      const agenda = []
+      const base = startOfDay(today)
+      for (let index = 0; index < 30; index += 1) {
+        const day = addDays(base, index)
+        const key = dayKey(day)
+        const dayEvents = eventsByDay.get(key) ?? []
+        const dayTasks = tasksByDay.get(key) ?? []
+        if (dayEvents.length > 0 || dayTasks.length > 0) agenda.push({ day, events: dayEvents, tasks: dayTasks })
+      }
+
+      return h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 } },
+        toolbar,
+        h(
+          'div',
+          { style: { flex: 1, overflowY: 'auto', padding: '8px 20px 24px' } },
+          agenda.length === 0
+            ? h('div', { style: S.empty }, t('calEmpty'))
+            : agenda.map(({ day, events: dayEvents, tasks: dayTasks }) => h(
+              'div',
+              { key: dayKey(day) },
+              h('div', { style: S.group }, humanDayLong(day)),
+              dayEvents.map(event => h(EventChip, { key: event.id, event, t, onClick: onOpenEvent })),
+              dayTasks.map(task => h(TaskChip, { key: task.id, task, onClick: onOpenTask })),
+            )),
+        ),
+      )
+    }
+
+    function EventDrawer(props) {
+      const { event, tasks, t, onClose, onSave, onDelete, onOpenTask } = props
+      const [title, setTitle] = useState(event.title)
+      const [date, setDate] = useState(dayKey(new Date(event.startAt)))
+      const [start, setStart] = useState(hhmm(event.startAt))
+      const [end, setEnd] = useState(hhmm(event.endAt))
+      const [allDay, setAllDay] = useState(event.allDay)
+      const [notes, setNotes] = useState(event.notes || '')
+      const [taskId, setTaskId] = useState(event.taskId || '')
+
+      useEffect(() => {
+        setTitle(event.title)
+        setDate(dayKey(new Date(event.startAt)))
+        setStart(hhmm(event.startAt))
+        setEnd(hhmm(event.endAt))
+        setAllDay(event.allDay)
+        setNotes(event.notes || '')
+        setTaskId(event.taskId || '')
+      }, [event.id, event.updatedAt])
+
+      const save = () => {
+        const startAt = new Date(`${date}T${allDay ? '00:00' : start}`)
+        let endAt = new Date(`${date}T${allDay ? '23:59' : end}`)
+        if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) return
+        if (endAt <= startAt) endAt = new Date(startAt.getTime() + 3600000)
+        onSave(event.id, {
+          title,
+          notes,
+          allDay,
+          taskId: taskId || '',
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        })
+      }
+
+      return h(
+        'aside',
+        { style: S.drawer, 'aria-label': t('ceTitle') },
+        h(
+          'div',
+          { style: S.drawerHead },
+          h('span', { style: S.drawerTitle }, t('ceTitle')),
+          h('button', { type: 'button', style: S.closeBtn, onClick: onClose, 'aria-label': t('close') }, '×'),
+        ),
+        h(
+          'div',
+          { style: S.field },
+          h('label', { style: S.label }, t('title')),
+          h('input', { style: S.fieldInput, value: title, onChange: e => setTitle(e.target.value) }),
+        ),
+        h(
+          'div',
+          { style: S.field },
+          h('label', { style: S.label }, t('ceDate')),
+          h('input', { type: 'date', style: S.fieldInput, value: date, onChange: e => setDate(e.target.value) }),
+        ),
+        h(
+          'label',
+          { style: { ...S.row, padding: '0 0 10px', cursor: 'pointer' } },
+          h('input', { type: 'checkbox', checked: allDay, onChange: e => setAllDay(e.target.checked) }),
+          h('span', { style: { fontSize: 12.5 } }, t('ceAllDay')),
+        ),
+        allDay
+          ? null
+          : h(
+            'div',
+            { style: { ...S.field, ...S.row2 } },
+            h(
+              'div',
+              { style: { flex: 1 } },
+              h('label', { style: S.label }, t('ceStart')),
+              h('input', { type: 'time', style: S.fieldInput, value: start, onChange: e => setStart(e.target.value) }),
+            ),
+            h(
+              'div',
+              { style: { flex: 1 } },
+              h('label', { style: S.label }, t('ceEnd')),
+              h('input', { type: 'time', style: S.fieldInput, value: end, onChange: e => setEnd(e.target.value) }),
+            ),
+          ),
+        h(
+          'div',
+          { style: S.field },
+          h('label', { style: S.label }, t('ceTask')),
+          h(
+            'select',
+            { style: S.fieldInput, value: taskId, onChange: e => setTaskId(e.target.value) },
+            [h('option', { key: '', value: '' }, t('ceNoTask'))].concat(
+              tasks.map(task => h('option', { key: task.id, value: task.id }, task.title)),
+            ),
+          ),
+        ),
+        taskId
+          ? h(
+            'button',
+            {
+              type: 'button',
+              style: { ...S.subtleBtn, marginBottom: 10 },
+              onClick: () => onOpenTask(taskId),
+            },
+            t('ceOpenTask'),
+          )
+          : null,
+        h(
+          'div',
+          { style: S.field },
+          h('label', { style: S.label }, t('notes')),
+          h('textarea', { style: { ...S.fieldInput, ...S.textarea }, value: notes, onChange: e => setNotes(e.target.value) }),
+        ),
+        h(
+          'div',
+          { style: { ...S.row2, marginBottom: 12 } },
+          h('button', { type: 'button', style: S.primaryBtn, onClick: save }, t('ceSave')),
+          h('button', {
+            type: 'button',
+            style: S.dangerBtn,
+            onClick: () => {
+              if (window.confirm(t('ceDelete') + '?')) onDelete(event.id)
+            },
+          }, t('ceDelete')),
+        ),
+      )
+    }
+
     function Panel(props) {
       const t = key => props.t?.(key) ?? EN[key] ?? key
       const [data, setData] = useState(null)
@@ -706,6 +1288,9 @@ window.__ModuleLoader__.load({
       const [selectedId, setSelectedId] = useState(null)
       const [expanded, setExpanded] = useState({})
       const [draft, setDraft] = useState('')
+      const [calView, setCalView] = useState('month')
+      const [anchor, setAnchor] = useState(new Date())
+      const [selectedEventId, setSelectedEventId] = useState(null)
       const [addingList, setAddingList] = useState(false)
       const [listName, setListName] = useState('')
       const inputRef = useRef(null)
@@ -743,6 +1328,8 @@ window.__ModuleLoader__.load({
 
       const lists = data?.lists ?? []
       const tasks = data?.tasks ?? []
+      const events = data?.events ?? []
+      const isCalendar = view === 'calendar'
       const listById = useMemo(() => new Map(lists.map(list => [list.id, list])), [lists])
       const byId = useMemo(() => new Map(tasks.map(task => [task.id, task])), [tasks])
       const childrenOf = useMemo(() => {
@@ -756,6 +1343,8 @@ window.__ModuleLoader__.load({
       }, [tasks])
 
       const selected = selectedId ? byId.get(selectedId) ?? null : null
+      const selectedEvent = selectedEventId ? events.find(event => event.id === selectedEventId) ?? null : null
+      const linkedEvent = selected ? events.find(event => event.taskId === selected.id) ?? null : null
 
       const isOverdue = task => task.status !== 'done' && task.dueAt && Date.parse(task.dueAt) < dayStart(new Date()).getTime()
       const isToday = task => task.dueAt && sameDay(new Date(task.dueAt), new Date())
@@ -858,6 +1447,40 @@ window.__ModuleLoader__.load({
 
       const toggleExpand = id => setExpanded(current => ({ ...current, [id]: !current[id] }))
 
+      const createEventAt = async (date, hour = 10) => {
+        const start = new Date(date)
+        start.setHours(hour, 0, 0, 0)
+        const end = new Date(start.getTime() + 3600000)
+        const payload = await mutate('/events', 'POST', { title: t('calNew'), startAt: start.toISOString(), endAt: end.toISOString() })
+        if (payload?.event) {
+          setSelectedId(null)
+          setSelectedEventId(payload.event.id)
+        }
+      }
+
+      const saveEvent = async (id, patch) => mutate(`/events/${id}`, 'PATCH', patch)
+
+      const removeEvent = async id => {
+        await mutate(`/events/${id}`, 'DELETE')
+        setSelectedEventId(null)
+      }
+
+      const taskToCalendar = async task => {
+        const start = task.dueAt ? new Date(task.dueAt) : new Date(Date.now() + 3600000)
+        const end = new Date(start.getTime() + 3600000)
+        await mutate('/events', 'POST', {
+          title: task.title,
+          startAt: start.toISOString(),
+          endAt: end.toISOString(),
+          taskId: task.id,
+        })
+      }
+
+      const openTaskFromCalendar = id => {
+        setSelectedEventId(null)
+        setSelectedId(id)
+      }
+
       const progressOf = id => {
         const children = childrenOf.get(id) ?? []
         return { done: children.filter(child => child.status === 'done').length, total: children.length }
@@ -888,8 +1511,9 @@ window.__ModuleLoader__.load({
               onClick: () => setView('tree'),
             }, t('tabTree')),
             h('button', {
-              type: 'button', role: 'tab', 'aria-selected': false, disabled: true,
-              title: t('tabSoon'), style: { ...S.tab, ...S.tabDisabled },
+              type: 'button', role: 'tab', 'aria-selected': view === 'calendar',
+              style: view === 'calendar' ? { ...S.tab, ...S.tabActive } : S.tab,
+              onClick: () => setView('calendar'),
             }, t('tabCalendar')),
           ),
           h(
@@ -910,7 +1534,9 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { style: S.body },
-          h(
+          isCalendar
+            ? null
+            : h(
             'nav',
             { style: S.nav },
             h('div', { style: S.navSection }, t('fAll')),
@@ -959,7 +1585,27 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { style: S.main },
-            h(
+            isCalendar
+              ? h(CalendarPanel, {
+                events,
+                tasks,
+                lists,
+                t,
+                calView,
+                onCalView: setCalView,
+                anchor,
+                onAnchor: setAnchor,
+                onOpenEvent: id => {
+                  setSelectedId(null)
+                  setSelectedEventId(id)
+                },
+                onNewEvent: createEventAt,
+                onOpenTask: openTaskFromCalendar,
+              })
+              : null,
+            isCalendar
+              ? null
+              : h(
               'div',
               { style: S.quickAdd },
               h('input', {
@@ -975,7 +1621,9 @@ window.__ModuleLoader__.load({
               }),
               h('button', { type: 'button', style: S.primaryBtn, onClick: () => addTask(draft) }, t('add')),
             ),
-            h(
+            isCalendar
+              ? null
+              : h(
               'div',
               { style: S.scroll },
               filterTasks.length === 0
@@ -1028,12 +1676,24 @@ window.__ModuleLoader__.load({
                   )),
             ),
           ),
-          selected
+          selectedEvent
+            ? h(EventDrawer, {
+              event: selectedEvent,
+              tasks,
+              t,
+              onClose: () => setSelectedEventId(null),
+              onSave: saveEvent,
+              onDelete: removeEvent,
+              onOpenTask: openTaskFromCalendar,
+            })
+            : selected
             ? h(Drawer, {
               task: selected,
               lists,
               tasks,
               t,
+              linkedEvent,
+              onToCalendar: taskToCalendar,
               onClose: () => setSelectedId(null),
               onSave: saveTask,
               onDelete: removeTask,
