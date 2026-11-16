@@ -1,0 +1,56 @@
+{
+  "name": "dsh-task-hub",
+  "version": "0.1.0",
+  "description": "Task tree, calendar and unified mail for DeepSeek Harness — a first-class workspace in the left sidebar.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/akkrevsky/dsh-task-hub.git"
+  },
+  "homepage": "https://github.com/akkrevsky/dsh-task-hub",
+  "bugs": {
+    "url": "https://github.com/akkrevsky/dsh-task-hub/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "tasks",
+    "calendar",
+    "caldav",
+    "mail",
+    "imap"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.2"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "test": "node tests/smoke.mjs"
+  }
+}

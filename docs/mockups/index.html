@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tasks Hub · макеты для DSH</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f7f7fa;
+    --line: #e7e7ed;
+    --ink: #16161a;
+    --ink2: #55555f;
+    --mut: #8b8b97;
+    --brand: #4d6bfe;
+    --soft: #edf0fe;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg-soft);
+    color: var(--ink);
+    font: 14px/1.45 Inter, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .logo {
+    width: 28px; height: 28px; border-radius: 8px; background: var(--brand);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+  }
+  h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .sub { color: var(--mut); font-size: 12px; }
+  nav { display: flex; gap: 4px; margin-left: auto; background: #f3f4f9; padding: 3px; border-radius: 10px; }
+  nav button {
+    appearance: none; border: 0; background: transparent; color: var(--ink2);
+    font: 500 12.5px/1 inherit; padding: 9px 14px; border-radius: 8px; cursor: pointer;
+  }
+  nav button:hover { color: var(--ink); }
+  nav button[aria-selected="true"] {
+    background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22,22,26,.08);
+    font-weight: 600;
+  }
+  main { flex: 1; padding: 22px 28px 32px; display: flex; flex-direction: column; gap: 14px; }
+  .stage {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; box-shadow: 0 8px 28px rgba(22,22,26,.06);
+  }
+  .stage img { display: block; width: 100%; height: auto; border-radius: 8px; }
+  .meta { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; padding: 0 4px; }
+  .meta h2 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  .meta p { margin: 0; color: var(--ink2); font-size: 12.5px; max-width: 760px; }
+  .hint { margin-left: auto; color: var(--mut); font-size: 11.5px; white-space: nowrap; }
+  kbd {
+    font: 500 10.5px/1 inherit; border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 3px 5px; background: #fff; color: var(--ink2);
+  }
+  footer { padding: 14px 28px 22px; color: var(--mut); font-size: 11.5px; }
+  footer a { color: var(--brand); text-decoration: none; }
+  @media (max-width: 720px) {
+    header { padding: 14px 16px; }
+    nav { margin-left: 0; order: 3; width: 100%; overflow-x: auto; }
+    main { padding: 14px 16px 24px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" aria-hidden="true">T</div>
+  <div>
+    <h1>Tasks Hub — макеты плагина для DSH</h1>
+    <div class="sub">Левая навигация DSH · списки, дерево, календарь, единая почта · Google / Яндекс / Mail.ru</div>
+  </div>
+  <nav role="tablist" aria-label="Экраны">
+    <button role="tab" aria-selected="true" data-i="0">Архитектура</button>
+    <button role="tab" aria-selected="false" data-i="1">Списки</button>
+    <button role="tab" aria-selected="false" data-i="2">Дерево</button>
+    <button role="tab" aria-selected="false" data-i="3">Календарь</button>
+    <button role="tab" aria-selected="false" data-i="4">Почта</button>
+  </nav>
+</header>
+
+<main>
+  <div class="stage"><img id="shot" alt="Макет интерфейса Tasks Hub" src="00-architecture.png"></div>
+  <div class="meta">
+    <div>
+      <h2 id="title">Архитектура плагина</h2>
+      <p id="desc">Две половины одного bundle: React-компоненты в штатных слотах Web UI и host-сервис в процессе DSH. Обмен — через Remote-методы, секреты — в ctx.credentials, данные — в ~/.dsh/plugin-data.</p>
+    </div>
+    <div class="hint"><kbd>←</kbd> <kbd>→</kbd> переключение экранов</div>
+  </div>
+</main>
+
+<footer>
+  Статичные макеты для согласования; интерактив появится в реализации (M0–M2). План: <a href="../PLAN.md">PLAN.md</a> ·
+  компоненты: <a href="00-architecture.svg">SVG</a>, <a href="01-lists.svg">списки</a>, <a href="02-tree.svg">дерево</a>,
+  <a href="03-calendar.svg">календарь</a>, <a href="04-mail.svg">почта</a>.
+</footer>
+
+<script>
+  const views = [
+    { img: '00-architecture.png', title: 'Архитектура плагина',
+      desc: 'Две половины одного bundle: React-компоненты в штатных слотах Web UI и host-сервис в процессе DSH. Обмен — через Remote-методы, секреты — в ctx.credentials, данные — в ~/.dsh/plugin-data.' },
+    { img: '01-lists.png', title: 'Задачи · Списки',
+      desc: 'Две новые записи в левой навигации («Задачи», «Почта»). Умные списки и списки с цветами, задачи со сроком, приоритетом и меткой источника (G/Y/M), подзадачи с отступом, быстрый ввод внизу.' },
+    { img: '02-tree.png', title: 'Задачи · Дерево',
+      desc: 'Дерево проекта с прогрессом и карточка задачи справа: описание, подзадачи, связи с событием календаря и сессией DSH. Источник задачи (Mail.ru) виден прямо в строке.' },
+    { img: '03-calendar.png', title: 'Задачи · Календарь',
+      desc: 'Переключение вида календаря: месяц / неделя / повестка. События окрашены по провайдеру, задачи — отдельными строками; справа — мини-месяц, статусы подключений и ближайшие события.' },
+    { img: '04-mail.png', title: 'Почта · единый ящик',
+      desc: 'Отдельная запись в навигации: ящики Gmail / Яндекс / Mail.ru, список и чтение письма. Кнопка «В задачу» создаёт задачу со сроком письма и ссылкой на тред.' }
+  ];
+  const buttons = [...document.querySelectorAll('nav button')];
+  const shot = document.getElementById('shot');
+  const title = document.getElementById('title');
+  const desc = document.getElementById('desc');
+  let current = 0;
+  function show(i) {
+    current = (i + views.length) % views.length;
+    const v = views[current];
+    shot.src = v.img;
+    shot.alt = 'Макет: ' + v.title;
+    title.textContent = v.title;
+    desc.textContent = v.desc;
+    buttons.forEach((b, n) => b.setAttribute('aria-selected', String(n === current)));
+  }
+  buttons.forEach((b, n) => b.addEventListener('click', () => show(n)));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') show(current + 1);
+    if (e.key === 'ArrowLeft') show(current - 1);
+  });
+  show(0);
+</script>
+</body>
+</html>
