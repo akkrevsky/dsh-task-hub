@@ -25,7 +25,7 @@ import {
   syncAccount,
   updateAccount,
 } from './accounts.js'
-import { listFolders, listMessages, readMessage } from './mail.js'
+import { listFolders, listMessages, readMessage, sendMail } from './mail.js'
 
 const API_PREFIX = '/dsh-task-hub/api'
 const STORE_VERSION = 1
@@ -481,6 +481,25 @@ function createHandler(store, accountsStore) {
           limit: url.searchParams.get('limit') || 40,
         })
         return send(res, 200, payload)
+      }
+      if (path === '/mail/send' && method === 'POST') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const body = await readJson(req)
+        const { account, config, password } = await mailCredentials(accountsStore, body.accountId)
+        const result = await sendMail({
+          smtp: { host: config.smtpHost, port: config.smtpPort, secure: Number(config.smtpPort) === 465 },
+          username: config.username,
+          password,
+          message: {
+            to: body.to,
+            cc: body.cc,
+            subject: body.subject,
+            text: body.text,
+            inReplyTo: body.inReplyTo,
+            references: body.references,
+          },
+        })
+        return send(res, 200, { ...result, account: account.username })
       }
       if (path === '/mail/message' && method === 'GET') {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })

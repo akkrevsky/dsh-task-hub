@@ -73,6 +73,9 @@ globalThis.fetch = async (url, options = {}) => {
     state = { ...state, events: [...state.events, event] }
     return { ok: true, status: 200, text: async () => JSON.stringify({ state, event }) }
   }
+  if (String(url).includes('/mail/send') && method === 'POST') {
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, messageId: 'sent-1' }) }
+  }
   if (String(url).includes('/mail/folders')) {
     return { ok: true, status: 200, text: async () => JSON.stringify({ folders: [{ path: 'INBOX', name: 'INBOX', specialUse: '\\Inbox' }] }) }
   }
@@ -99,6 +102,7 @@ globalThis.fetch = async (url, options = {}) => {
         to: 'me@example.com',
         date: iso(today),
         text: 'Тело письма',
+        messageId: '<msg-7@example.com>',
         attachments: [],
       }),
     }
@@ -265,7 +269,19 @@ click(mailRow)
 await tick()
 await tick()
 if (!mailHost.textContent.includes('Тело письма')) throw new Error('mail body did not render')
+const replyButton = [...mailHost.querySelectorAll('button')].find(b => b.textContent === 'Ответить')
+if (!replyButton) throw new Error('reply button missing')
+click(replyButton)
+await tick()
+const sendButton = [...mailHost.querySelectorAll('button')].find(b => b.textContent === 'Отправить')
+if (!sendButton) throw new Error('send button missing in the composer')
+click(sendButton)
+await tick()
+await tick()
+if (!calls.some(call => String(call.url).includes('/mail/send') && call.method === 'POST')) {
+  throw new Error('sending did not call the API')
+}
 mailRoot.unmount()
 
-console.log('ok: lists, calendar views, day click, event drawer, task → calendar, accounts tab, mail list and reader')
+console.log('ok: lists, calendar views, day click, task → calendar, accounts, mail reader, reply/send')
 console.log('calls:', calls.map(c => `${c.method} ${String(c.url).replace('http://127.0.0.1:3080', '')}`).join(', '))

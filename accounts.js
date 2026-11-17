@@ -130,6 +130,8 @@ function publicAccount(account) {
         port: account.mail.port ?? 993,
         secure: account.mail.secure !== false,
         username: account.mail.username ?? '',
+        smtpHost: account.mail.smtpHost ?? '',
+        smtpPort: account.mail.smtpPort ?? 465,
         status: account.mail.status ?? 'ok',
         lastCheckAt: account.mail.lastCheckAt ?? null,
       }
@@ -153,6 +155,8 @@ export async function connectMail(accountsStore, id, input) {
     port: Number(input?.port) || preset.port || 993,
     secure: input?.secure !== false,
     username,
+    smtpHost: String(input?.smtpHost || preset.smtpHost || '').trim(),
+    smtpPort: Number(input?.smtpPort) || preset.smtpPort || 465,
   }
   await verifyMail(config, password)
   const { result: updated, accounts } = await accountsStore.mutate(data => {

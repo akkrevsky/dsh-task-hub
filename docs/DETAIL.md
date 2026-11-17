@@ -3,10 +3,11 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M5 (read) — tasks, calendar and mail.** Lists, a task tree, a
-> calendar with two-way CalDAV and a separate Mail panel over IMAP (Yandex /
-> Mail.ru / Gmail): folders, message list, reader and "To task". Sending mail,
-> Google Calendar (OAuth) and VTODO sync are not implemented yet.
+> **Status: M5 — tasks, calendar and mail.** Lists, a task tree, a calendar
+> with two-way CalDAV and a Mail panel over IMAP (Yandex / Mail.ru / Gmail):
+> folders, message list, reader, "To task", and reply/new messages over SMTP
+> with an explicit confirmation. Google Calendar (OAuth) and VTODO sync are not
+> implemented yet.
 
 ## What works today
 
@@ -37,6 +38,9 @@ DeepSeek Harness left sidebar.
 - Mail: a second `main` panel (`dsh-task-hub-mail`) and rail entry; IMAP via
   `imapflow`, bodies via `mailparser`; the reader returns plain text (HTML is
   stripped), and "To task" copies the subject and the beginning of the body.
+- Sending: `nodemailer` inside the same isolated worker, SMTP hosts by provider
+  (smtp.yandex.ru / smtp.mail.ru / smtp.gmail.com, port 465). The client asks
+  for confirmation with the recipient and subject before sending.
 - Every IMAP operation runs in a short-lived child process (`mail-cli.mjs`):
   imapflow 1.7.8 can emit an unhandled rejection when a server drops the
   connection, which would end the Host. In a child it only fails that request.
@@ -47,7 +51,7 @@ DeepSeek Harness left sidebar.
 
 - Imported events open read-only; edit-back of an existing provider event is the next step.
 - Deleting an imported event deletes it on the provider too.
-- Google Calendar (M4) is not implemented; mail is read-only (no SMTP).
+- Google Calendar (M4) is not implemented; forwarding and attachments download are not implemented.
 - The week view shows a 24-hour grid without drag-and-drop resizing.
 - Single user, single profile: no sharing, no conflict resolution.
 - The store is a plain JSON file; it is not a database and has no history.
@@ -63,7 +67,7 @@ DeepSeek Harness left sidebar.
 | M3 (push) ✅ | Create/update/delete events with If-None-Match/If-Match, conflict surfaced as an error |
 | M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
 | M5 (read) ✅ | Mail over IMAP, read-only, "to task" |
-| M5 (send) | Reply/forward over SMTP with confirmation |
+| M5 (send) ✅ | Reply/new message over SMTP with confirmation |
 | M6 | Agent tools for calendar and mail, SMTP with explicit confirmation, polish |
 
 ## Installation

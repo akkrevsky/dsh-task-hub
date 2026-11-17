@@ -145,6 +145,15 @@ window.__ModuleLoader__.load({
       mailFrom: 'From',
       mailNoAccounts: 'Connect an account on the Accounts tab first.',
       mailFailed: 'Mail request failed',
+      reply: 'Reply',
+      compose: 'Write',
+      send: 'Send',
+      sending: 'Sending…',
+      sent: 'Sent',
+      cancel: 'Cancel',
+      mailTo: 'To',
+      mailSubject: 'Subject',
+      confirmSend: 'Send this message?',
     }
 
     const RU = {
@@ -269,6 +278,15 @@ window.__ModuleLoader__.load({
       mailFrom: 'От',
       mailNoAccounts: 'Сначала подключите аккаунт на вкладке «Аккаунты».',
       mailFailed: 'Запрос к почте не удался',
+      reply: 'Ответить',
+      compose: 'Написать',
+      send: 'Отправить',
+      sending: 'Отправляю…',
+      sent: 'Отправлено',
+      cancel: 'Отмена',
+      mailTo: 'Кому',
+      mailSubject: 'Тема',
+      confirmSend: 'Отправить письмо?',
     }
 
     /* ------------------------------------------------------------- helpers */
@@ -1900,6 +1918,45 @@ window.__ModuleLoader__.load({
         ['accounts', 'tabAccounts'],
       ]
 
+      const startReply = () => {
+        if (!message) return
+        const address = /<([^>]+)>/.exec(message.from || '')?.[1] || (message.from || '').trim()
+        setCompose({
+          to: address,
+          subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`,
+          text: '',
+          inReplyTo: message.messageId || undefined,
+        })
+      }
+
+      const startCompose = () => setCompose({ to: '', subject: '', text: '' })
+
+      const sendMessage = async () => {
+        if (!compose) return
+        if (!window.confirm(`${t('confirmSend')}\n${t('mailTo')}: ${compose.to}\n${t('mailSubject')}: ${compose.subject}`)) return
+        setSending(true)
+        setError(null)
+        try {
+          await api('/mail/send', {
+            method: 'POST',
+            body: JSON.stringify({
+              accountId,
+              to: compose.to,
+              subject: compose.subject,
+              text: compose.text,
+              inReplyTo: compose.inReplyTo,
+            }),
+          })
+          setToast(t('sent'))
+          setTimeout(() => setToast(null), 3000)
+          setCompose(null)
+        } catch (cause) {
+          setError(cause.message)
+        } finally {
+          setSending(false)
+        }
+      }
+
       const header = h('header', { style: S.header },
         h('span', { style: S.title }, t('title')),
         h('div', { style: S.tabs, role: 'tablist', 'aria-label': t('title') },
@@ -2167,6 +2224,8 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState(null)
       const [busy, setBusy] = useState(false)
       const [toast, setToast] = useState(null)
+      const [compose, setCompose] = useState(null)
+      const [sending, setSending] = useState(false)
       const [form, setForm] = useState({ provider: 'yandex', username: '', password: '', host: '' })
 
       const loadAccounts = useCallback(async () => {
@@ -2269,6 +2328,45 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const startReply = () => {
+        if (!message) return
+        const address = /<([^>]+)>/.exec(message.from || '')?.[1] || (message.from || '').trim()
+        setCompose({
+          to: address,
+          subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`,
+          text: '',
+          inReplyTo: message.messageId || undefined,
+        })
+      }
+
+      const startCompose = () => setCompose({ to: '', subject: '', text: '' })
+
+      const sendMessage = async () => {
+        if (!compose) return
+        if (!window.confirm(`${t('confirmSend')}\n${t('mailTo')}: ${compose.to}\n${t('mailSubject')}: ${compose.subject}`)) return
+        setSending(true)
+        setError(null)
+        try {
+          await api('/mail/send', {
+            method: 'POST',
+            body: JSON.stringify({
+              accountId,
+              to: compose.to,
+              subject: compose.subject,
+              text: compose.text,
+              inReplyTo: compose.inReplyTo,
+            }),
+          })
+          setToast(t('sent'))
+          setTimeout(() => setToast(null), 3000)
+          setCompose(null)
+        } catch (cause) {
+          setError(cause.message)
+        } finally {
+          setSending(false)
+        }
+      }
+
       const header = h('header', { style: S.header },
         h('span', { style: S.title }, t('mailTitle')),
         mailAccount
@@ -2289,6 +2387,9 @@ window.__ModuleLoader__.load({
           toast ? h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-state-success-primary)' } }, toast) : null,
           mailAccount
             ? h('button', { type: 'button', style: S.ghostBtn, onClick: () => loadMessages(mailAccount.id, folder) }, t('mailRefresh'))
+            : null,
+          mailAccount
+            ? h('button', { type: 'button', style: S.primaryBtn, onClick: startCompose }, t('compose'))
             : null))
 
       if (accounts.length === 0) {
@@ -2421,8 +2522,29 @@ window.__ModuleLoader__.load({
                       h('span', null, item.filename),
                       h('span', { style: S.railMuted }, `${Math.round((item.size || 0) / 1024)} КБ`))))
                   : null,
-                h('button', { type: 'button', style: { ...S.primaryBtn, marginTop: 18 }, onClick: toTask }, t('mailToTask')))
-              : h('div', { style: S.empty }, busy ? t('mailLoading') : t('mailPick')))))
+                h('div', { style: { display: 'flex', gap: 8, marginTop: 18 } },
+                  h('button', { type: 'button', style: S.primaryBtn, onClick: startReply }, t('reply')),
+                  h('button', { type: 'button', style: S.ghostBtn, onClick: toTask }, t('mailToTask'))))
+              : h('div', { style: S.empty }, busy ? t('mailLoading') : t('mailPick')),
+            compose
+              ? h('div', { style: { ...S.formCard, marginTop: 18, maxWidth: 620 } },
+                h('div', { style: S.formTitle }, t('compose')),
+                h('div', { style: S.field },
+                  h('label', { style: S.label }, t('mailTo')),
+                  h('input', { style: S.fieldInput, value: compose.to, onChange: e => setCompose({ ...compose, to: e.target.value }) })),
+                h('div', { style: S.field },
+                  h('label', { style: S.label }, t('mailSubject')),
+                  h('input', { style: S.fieldInput, value: compose.subject, onChange: e => setCompose({ ...compose, subject: e.target.value }) })),
+                h('div', { style: S.field },
+                  h('textarea', {
+                    style: { ...S.fieldInput, ...S.textarea, minHeight: 140 },
+                    value: compose.text,
+                    onChange: e => setCompose({ ...compose, text: e.target.value }),
+                  })),
+                h('div', { style: { display: 'flex', gap: 8 } },
+                  h('button', { type: 'button', style: S.primaryBtn, disabled: sending, onClick: sendMessage }, sending ? t('sending') : t('send')),
+                  h('button', { type: 'button', style: S.ghostBtn, onClick: () => setCompose(null) }, t('cancel'))))
+              : null)))
     }
 
     function PanelIcon(props) {

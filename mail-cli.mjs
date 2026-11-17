@@ -13,6 +13,7 @@
  */
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
+import nodemailer from 'nodemailer'
 
 const TIMEOUTS = { greetingTimeout: 10000, socketTimeout: 25000 }
 const MAX_BODY = 200000
@@ -129,6 +130,42 @@ const operations = {
     })
   },
 
+  async send({ smtp, username, password, message }) {
+    if (!smtp?.host) throw new Error('не задан SMTP-сервер')
+    if (!username) throw new Error('не задан логин почты')
+    if (!password) throw new Error('нет пароля почты — подключите ящик заново')
+    const to = String(message?.to ?? '').trim()
+    const subject = String(message?.subject ?? '').trim().slice(0, 300)
+    const text = String(message?.text ?? '')
+    if (!/^[^@\s]+@[^@\s]+$/.test(to)) throw new Error('укажите корректный адрес получателя')
+    if (!subject) throw new Error('тема письма не может быть пустой')
+    if (text.length > 100000) throw new Error('письмо слишком длинное (макс. 100 000 символов)')
+
+    const transport = nodemailer.createTransport({
+      host: smtp.host,
+      port: Number(smtp.port) || 465,
+      secure: smtp.secure !== false,
+      auth: { user: username, pass: password },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 25000,
+    })
+    try {
+      const info = await transport.sendMail({
+        from: username,
+        to,
+        cc: typeof message?.cc === 'string' && message.cc.trim() ? message.cc.trim() : undefined,
+        subject,
+        text,
+        inReplyTo: message?.inReplyTo || undefined,
+        references: message?.references || undefined,
+      })
+      return { messageId: info.messageId ?? null, accepted: info.accepted ?? [] }
+    } finally {
+      transport.close()
+    }
+  },
+
   async message({ config, password, folder = 'INBOX', uid }) {
     const wanted = Number(uid)
     if (!Number.isFinite(wanted)) throw new Error('uid must be a number')
@@ -147,6 +184,7 @@ const operations = {
           uid: wanted,
           folder,
           subject: parsed.subject || '(без темы)',
+          messageId: parsed.messageId || null,
           from: parsed.from?.text || '',
           to: parsed.to?.text || '',
           date: parsed.date ? new Date(parsed.date).toISOString() : null,

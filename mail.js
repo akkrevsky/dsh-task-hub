@@ -13,10 +13,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const MAIL_PRESETS = {
-  yandex: { host: 'imap.yandex.ru', port: 993, secure: true, label: 'Яндекс' },
-  mailru: { host: 'imap.mail.ru', port: 993, secure: true, label: 'Mail.ru' },
-  gmail: { host: 'imap.gmail.com', port: 993, secure: true, label: 'Gmail' },
-  custom: { host: '', port: 993, secure: true, label: 'Другой IMAP' },
+  yandex: { host: 'imap.yandex.ru', port: 993, secure: true, smtpHost: 'smtp.yandex.ru', smtpPort: 465, label: 'Яндекс' },
+  mailru: { host: 'imap.mail.ru', port: 993, secure: true, smtpHost: 'smtp.mail.ru', smtpPort: 465, label: 'Mail.ru' },
+  gmail: { host: 'imap.gmail.com', port: 993, secure: true, smtpHost: 'smtp.gmail.com', smtpPort: 465, label: 'Gmail' },
+  custom: { host: '', port: 993, secure: true, smtpHost: '', smtpPort: 465, label: 'Другой IMAP' },
 }
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'mail-cli.mjs')
@@ -67,7 +67,7 @@ function runMailOp(op, payload) {
       // imapflow can surface a bare TypeError when the socket dies before
       // connect() settles; keep the UI message useful.
       if (/Cannot read properties|reading 'catch'|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|socket hang up/i.test(reason)) {
-        reason = 'IMAP: не удалось подключиться к серверу'
+        reason = 'Почта: не удалось подключиться к серверу'
       }
       finish(new Error(reason))
     })
@@ -91,4 +91,8 @@ export function listMessages({ config, password, folder = 'INBOX', limit = 40 })
 
 export function readMessage({ config, password, folder = 'INBOX', uid }) {
   return runMailOp('message', { config, password, folder, uid })
+}
+
+export function sendMail({ smtp, username, password, message }) {
+  return runMailOp('send', { smtp, username, password, message })
 }
