@@ -3,11 +3,10 @@
 Tasks, a calendar and a unified mailbox as one first-class workspace in the
 DeepSeek Harness left sidebar.
 
-> **Status: M5 — tasks, calendar and mail.** Lists, a task tree, a calendar
-> with two-way CalDAV and a Mail panel over IMAP (Yandex / Mail.ru / Gmail):
-> folders, message list, reader, "To task", and reply/new messages over SMTP
-> with an explicit confirmation. Google Calendar (OAuth) and VTODO sync are not
-> implemented yet.
+> **Status: M4–M5 (pull) — tasks, calendar, Google and mail.** Lists, a task
+> tree, a calendar with two-way CalDAV, Google Calendar import over OAuth 2.0
+> and a Mail panel over IMAP (Yandex / Mail.ru / Gmail) with reply/send over
+> SMTP. Writing back to Google and VTODO sync are not implemented yet.
 
 ## What works today
 
@@ -41,6 +40,10 @@ DeepSeek Harness left sidebar.
 - Sending: `nodemailer` inside the same isolated worker, SMTP hosts by provider
   (smtp.yandex.ru / smtp.mail.ru / smtp.gmail.com, port 465). The client asks
   for confirmation with the recipient and subject before sending.
+- Google: OAuth 2.0 with the user's own web client. Because its redirect URI is
+  a loopback address, the flow is link + paste-back of the redirect URL; the
+  code is exchanged on the Host, tokens stay in `google-tokens.json` (0600) and
+  the browser only ever sees the authorization URL. Import is read-only.
 - Every IMAP operation runs in a short-lived child process (`mail-cli.mjs`):
   imapflow 1.7.8 can emit an unhandled rejection when a server drops the
   connection, which would end the Host. In a child it only fails that request.
@@ -65,7 +68,8 @@ DeepSeek Harness left sidebar.
 | M2 ✅ | Calendar views (month / week / agenda) on local data, task ↔ event link |
 | M3 (pull) ✅ | CalDAV import: Yandex and Mail.ru, discovery, iCalendar reader |
 | M3 (push) ✅ | Create/update/delete events with If-None-Match/If-Match, conflict surfaced as an error |
-| M4 | Google: OAuth 2.0 (loopback + PKCE), Calendar `syncToken`, Tasks API |
+| M4 (pull) ✅ | Google: OAuth 2.0, calendar list, event import, read-only |
+| M4 (push) | Write events to Google, `syncToken`, Google Tasks |
 | M5 (read) ✅ | Mail over IMAP, read-only, "to task" |
 | M5 (send) ✅ | Reply/new message over SMTP with confirmation |
 | M6 | Agent tools for calendar and mail, SMTP with explicit confirmation, polish |

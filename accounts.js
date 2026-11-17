@@ -168,6 +168,32 @@ export async function connectMail(accountsStore, id, input) {
   return { account: publicAccount(updated), accounts }
 }
 
+/** Persist a Google account created by the OAuth flow. */
+export async function connectGoogleAccount(accountsStore, { email, calendars }) {
+  const account = {
+    id: randomUUID(),
+    provider: 'google',
+    username: email || 'Google Calendar',
+    baseUrl: '',
+    calendars: calendars.map(calendar => ({
+      href: calendar.href,
+      title: calendar.title,
+      color: calendar.color || '#4285F4',
+      components: calendar.components || ['VEVENT'],
+      selected: calendar.selected !== false,
+    })),
+    status: 'ok',
+    error: null,
+    createdAt: new Date().toISOString(),
+    lastSyncAt: null,
+  }
+  const { accounts } = await accountsStore.mutate(data => {
+    data.accounts.push(account)
+    return account
+  })
+  return { account: publicAccount(account), accounts }
+}
+
 export async function removeMail(accountsStore, id) {
   const { result, accounts } = await accountsStore.mutate(data => {
     const found = data.accounts.find(item => item.id === id)

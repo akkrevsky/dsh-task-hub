@@ -21,6 +21,7 @@ window.__ModuleLoader__.load({
       yandex: { label: 'Яндекс', letter: 'Я', color: '#FC3F1D' },
       mailru: { label: 'Mail.ru', letter: 'M', color: '#005FF9' },
       caldav: { label: 'CalDAV', letter: 'C', color: '#4D6BFE' },
+      google: { label: 'Google', letter: 'G', color: '#4285F4' },
     }
 
     const EN = {
@@ -154,6 +155,12 @@ window.__ModuleLoader__.load({
       mailTo: 'To',
       mailSubject: 'Subject',
       confirmSend: 'Send this message?',
+      googleConnect: 'Google Calendar',
+      googleHint: 'Sign in to Google, then paste the address you were redirected to. The page itself will not open — that is expected.',
+      googleGetLink: 'Get sign-in link',
+      googleOpen: 'Open Google',
+      googlePaste: 'Paste the redirect address',
+      googleFinish: 'Finish connection',
     }
 
     const RU = {
@@ -287,6 +294,12 @@ window.__ModuleLoader__.load({
       mailTo: 'Кому',
       mailSubject: 'Тема',
       confirmSend: 'Отправить письмо?',
+      googleConnect: 'Google Calendar',
+      googleHint: 'Войдите в Google, затем вставьте адрес, на который вас перенаправило. Страница по этому адресу не откроется — так и должно быть.',
+      googleGetLink: 'Получить ссылку',
+      googleOpen: 'Открыть Google',
+      googlePaste: 'Вставьте адрес редиректа',
+      googleFinish: 'Завершить подключение',
     }
 
     /* ------------------------------------------------------------- helpers */
@@ -1550,7 +1563,40 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------- accounts */
 
     function AccountsPage(props) {
-      const { accounts, form, setForm, error, busy, t, onConnect, onSync, onRemove, onToggleCalendar } = props
+      const { accounts, form, setForm, error, busy, t, onConnect, onSync, onRemove, onToggleCalendar, onReload } = props
+      const [gUrl, setGUrl] = useState('')
+      const [gPaste, setGPaste] = useState('')
+      const [gBusy, setGBusy] = useState(false)
+      const [gError, setGError] = useState(null)
+
+      const startGoogle = async () => {
+        setGBusy(true)
+        setGError(null)
+        try {
+          const payload = await api('/google/start', { method: 'POST' })
+          setGUrl(payload.url)
+          window.open(payload.url, '_blank', 'noopener,noreferrer')
+        } catch (cause) {
+          setGError(cause.message)
+        } finally {
+          setGBusy(false)
+        }
+      }
+
+      const finishGoogle = async () => {
+        setGBusy(true)
+        setGError(null)
+        try {
+          await api('/google/finish', { method: 'POST', body: JSON.stringify({ value: gPaste }) })
+          setGUrl('')
+          setGPaste('')
+          onReload?.()
+        } catch (cause) {
+          setGError(cause.message)
+        } finally {
+          setGBusy(false)
+        }
+      }
       return h('div', { style: S.page },
         h('div', { style: S.pageTitle }, t('accountsTitle')),
         h('div', { style: S.pageSub }, t('accountsSub')),
@@ -1573,6 +1619,29 @@ window.__ModuleLoader__.load({
             h('div', { style: { display: 'flex', gap: 6, marginTop: 10 } },
               h('button', { type: 'button', style: S.ghostBtn, disabled: busy, onClick: () => onSync(account.id) }, t('syncNow')),
               h('button', { type: 'button', style: S.dangerBtn, disabled: busy, onClick: () => onRemove(account.id) }, t('remove'))))),
+        h('div', { style: S.formCard },
+          h('div', { style: S.formTitle }, t('googleConnect')),
+          h('div', { style: S.pageSub }, t('googleHint')),
+          h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+            h('button', { type: 'button', style: S.primaryBtn, disabled: gBusy, onClick: startGoogle }, t('googleGetLink')),
+            gUrl
+              ? h('button', { type: 'button', style: S.ghostBtn, onClick: () => window.open(gUrl, '_blank', 'noopener,noreferrer') }, t('googleOpen'))
+              : null),
+          gUrl
+            ? h('div', { style: { ...S.accountMeta, marginTop: 8, wordBreak: 'break-all' } }, gUrl)
+            : null,
+          gUrl
+            ? h('div', { style: { ...S.field, marginTop: 12 } },
+              h('label', { style: S.label }, t('googlePaste')),
+              h('textarea', {
+                style: { ...S.fieldInput, ...S.textarea, minHeight: 60 },
+                value: gPaste,
+                onChange: event => setGPaste(event.target.value),
+              }),
+              h('button', { type: 'button', style: S.primaryBtn, disabled: gBusy || !gPaste.trim(), onClick: finishGoogle },
+                gBusy ? t('connecting') : t('googleFinish')))
+            : null,
+          gError ? h('div', { style: { ...S.accountMeta, color: 'var(--dsw-alias-state-error-primary)', marginTop: 8 } }, gError) : null),
         h('div', { style: S.formCard },
           h('div', { style: S.formTitle }, t('addAccount')),
           h('div', { style: S.segmented },
@@ -2137,6 +2206,7 @@ window.__ModuleLoader__.load({
             onSync: syncNow,
             onRemove: removeAccount,
             onToggleCalendar: toggleCalendar,
+            onReload: loadAccounts,
           }))
       }
 

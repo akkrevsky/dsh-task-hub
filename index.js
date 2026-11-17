@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto'
 import {
   AccountsStore,
   connectAccount,
+  connectGoogleAccount,
   connectMail,
   deleteEventRemote,
   mailCredentials,
@@ -26,6 +27,14 @@ import {
   updateAccount,
 } from './accounts.js'
 import { listFolders, listMessages, readMessage, sendMail } from './mail.js'
+import {
+  completeConnect,
+  createAuthUrl,
+  deleteTokens,
+  googleStatus,
+  syncGoogle,
+  writeTokens,
+} from './google.js'
 
 const API_PREFIX = '/dsh-task-hub/api'
 const STORE_VERSION = 1
@@ -43,10 +52,18 @@ const LIST_COLORS = ['#4D6BFE', '#8E5BF0', '#2F9E63', '#F59E0B', '#DC3B3B', '#0E
 
 /* ------------------------------------------------------------------ store */
 
+const DATA_DIR = process.env.DSH_TASK_HUB_DIR || null
+
+function dataDir() {
+  if (process.env.DSH_TASK_HUB_STORE) return dirname(process.env.DSH_TASK_HUB_STORE)
+  if (DATA_DIR) return DATA_DIR
+  const home = process.env.DSH_HOME || join(homedir(), '.dsh')
+  return join(home, 'plugin-data', 'dsh-task-hub')
+}
+
 function storeFile() {
   if (process.env.DSH_TASK_HUB_STORE) return process.env.DSH_TASK_HUB_STORE
-  const home = process.env.DSH_HOME || join(homedir(), '.dsh')
-  return join(home, 'plugin-data', 'dsh-task-hub', 'tasks.json')
+  return join(dataDir(), 'tasks.json')
 }
 
 function emptyState() {
@@ -443,6 +460,22 @@ function createHandler(store, accountsStore) {
 
       if (method === 'GET' && (path === '/state' || path === '/')) return send(res, 200, await store.read())
 
+      if (path === '/google/status' && method === 'GET') {
+        return send(res, 200, await googleStatus(DATA_DIR))
+      }
+      if (path === '/google/start' && method === 'POST') {
+        const started = await createAuthUrl(DATA_DIR)
+        return send(res, 200, started)
+      }
+      if (path === '/google/finish' && method === 'POST') {
+        if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
+        const body = await readJson(req)
+        const { tokens, email, calendars } = await completeConnect(DATA_DIR, body.value ?? body.code ?? body.redirectUrl)
+        const { account, accounts } = await connectGoogleAccount(accountsStore, { email, calendars })
+        await writeTokens(DATA_DIR, account.id, tokens)
+        return send(res, 200, { account, accounts, state: await store.read() })
+      }
+
       if (path === '/accounts' && method === 'GET') {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         return send(res, 200, { accounts: await accountsStore.list() })
@@ -516,7 +549,11 @@ function createHandler(store, accountsStore) {
       if (method === 'POST' && /^\/accounts\/[^/]+\/sync$/.test(path)) {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         const id = decodeURIComponent(path.slice('/accounts/'.length, -'/sync'.length))
-        const result = await syncAccount({ accountsStore, taskStore: store, id })
+        const account = await accountsStore.get(id)
+        if (!account) return send(res, 404, { error: `unknown account: ${id}` })
+        const result = account.provider === 'google'
+          ? await syncGoogle({ dir: DATA_DIR, accountsStore, taskStore: store, id })
+          : await syncAccount({ accountsStore, taskStore: store, id })
         return send(res, 200, result)
       }
       if (method === 'PATCH' && /^\/accounts\/[^/]+$/.test(path)) {
@@ -530,6 +567,7 @@ function createHandler(store, accountsStore) {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         const id = decodeURIComponent(path.slice('/accounts/'.length))
         await removeAccount(accountsStore, id)
+        await deleteTokens(DATA_DIR, id)
         const { state } = await store.mutate(draft => {
           draft.events = draft.events.filter(event => event.source?.accountId !== id)
           return null

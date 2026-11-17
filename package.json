@@ -1,6 +1,6 @@
 {
   "name": "dsh-task-hub",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Task tree, calendar and unified mail for DeepSeek Harness — a first-class workspace in the left sidebar.",
   "type": "module",
   "license": "MIT",
@@ -38,6 +38,7 @@
     "caldav.js",
     "mail.js",
     "mail-cli.mjs",
+    "google.js",
     "cordis.patch.yml",
     "locale/*.json",
     "docs",
@@ -55,7 +56,7 @@
     }
   },
   "scripts": {
-    "test": "node tests/store.mjs && node tests/caldav.mjs && node tests/mail.mjs && node tests/smoke.mjs",
+    "test": "node tests/store.mjs && node tests/caldav.mjs && node tests/mail.mjs && node tests/google.mjs && node tests/smoke.mjs",
     "test:ui": "node tests/ui.mjs"
   },
   "devDependencies": {
