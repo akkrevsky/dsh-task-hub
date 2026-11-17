@@ -461,18 +461,18 @@ function createHandler(store, accountsStore) {
       if (method === 'GET' && (path === '/state' || path === '/')) return send(res, 200, await store.read())
 
       if (path === '/google/status' && method === 'GET') {
-        return send(res, 200, await googleStatus(DATA_DIR))
+        return send(res, 200, await googleStatus(dataDir()))
       }
       if (path === '/google/start' && method === 'POST') {
-        const started = await createAuthUrl(DATA_DIR)
+        const started = await createAuthUrl(dataDir())
         return send(res, 200, started)
       }
       if (path === '/google/finish' && method === 'POST') {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         const body = await readJson(req)
-        const { tokens, email, calendars } = await completeConnect(DATA_DIR, body.value ?? body.code ?? body.redirectUrl)
+        const { tokens, email, calendars } = await completeConnect(dataDir(), body.value ?? body.code ?? body.redirectUrl)
         const { account, accounts } = await connectGoogleAccount(accountsStore, { email, calendars })
-        await writeTokens(DATA_DIR, account.id, tokens)
+        await writeTokens(dataDir(), account.id, tokens)
         return send(res, 200, { account, accounts, state: await store.read() })
       }
 
@@ -552,7 +552,7 @@ function createHandler(store, accountsStore) {
         const account = await accountsStore.get(id)
         if (!account) return send(res, 404, { error: `unknown account: ${id}` })
         const result = account.provider === 'google'
-          ? await syncGoogle({ dir: DATA_DIR, accountsStore, taskStore: store, id })
+          ? await syncGoogle({ dir: dataDir(), accountsStore, taskStore: store, id })
           : await syncAccount({ accountsStore, taskStore: store, id })
         return send(res, 200, result)
       }
@@ -567,7 +567,7 @@ function createHandler(store, accountsStore) {
         if (!accountsStore) return send(res, 501, { error: 'accounts are not configured' })
         const id = decodeURIComponent(path.slice('/accounts/'.length))
         await removeAccount(accountsStore, id)
-        await deleteTokens(DATA_DIR, id)
+        await deleteTokens(dataDir(), id)
         const { state } = await store.mutate(draft => {
           draft.events = draft.events.filter(event => event.source?.accountId !== id)
           return null
