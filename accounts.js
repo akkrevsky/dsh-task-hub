@@ -186,7 +186,16 @@ export async function mailCredentials(accountsStore, id) {
   if (!account.mail) throw new Error('для этого аккаунта почта не подключена')
   const password = await accountsStore.mailPassword(id)
   if (!password) throw new Error('нет пароля почты — подключите ящик заново')
-  return { account, config: account.mail, password }
+  // Accounts connected before SMTP support have no smtp fields yet: fill them
+  // from the provider preset so sending works without reconnecting.
+  const preset = MAIL_PRESETS[account.mail.provider] ?? {}
+  const config = {
+    ...account.mail,
+    host: account.mail.host || preset.host || '',
+    smtpHost: account.mail.smtpHost || preset.smtpHost || '',
+    smtpPort: account.mail.smtpPort || preset.smtpPort || 465,
+  }
+  return { account, config, password }
 }
 
 /**
